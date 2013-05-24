@@ -1,0 +1,87 @@
+.hook-mgr-container {
+    position: relative;
+}
+
+.hooks-active-container {
+    padding-top: 10px;
+}
+
+.hook-mgr-container h3{
+    margin-bottom: 0;
+    margin-top: 0;
+    position: relative;
+}
+
+.hook{
+    padding: 0 10px 8px;
+}
+
+.hook-title{
+    margin: 0 0 8px;
+    padding-top: 10px;
+}
+
+.hook-description{
+    margin-top: 0;
+    margin-bottom: 0px;
+}
+
+.hook-remove{
+    float: right;
+    display: block;
+    height: 16px;
+    background: url('delete.png') no-repeat center center;
+    width: 16px;
+    position: absolute;
+    right: 5px;
+    top: 5px;
+    padding: 0px;
+    cursor: pointer;
+}
+
+/* drag and drop, sortable */
+.will-eat-hook {
+
+}
+
+.ready-for-hook{
+    -moz-box-shadow: inset 0 0 10px #f93;
+    -webkit-box-shadow: inset 0 0 10px #f93;
+    box-shadow: inset 0 0 10px #f93;
+}
+
+.hook.ui-draggable-dragging, .hook.ui-sortable-helper{
+    padding: 0 3px;
+    border: 1px solid #555;
+    border-radius: 6px;
+}
+
+li.hook.ui-sortable-helper{
+    padding-bottom: 20px;
+}
+
+.deck.hooks {
+    display: block;
+    width: auto;
+    margin-top: 15px;
+}
+
+.drop-area.hook {
+    padding: 0;
+}
+
+.buttons {
+    position: absolute;
+    top: 0px;
+    right: 0px;
+}
+
+.confirmMessage {
+    display: inline-block;
+    margin-top: 14px;
+}
+
+.waitContainer {
+    width: 100%;
+    height: 120px;
+}

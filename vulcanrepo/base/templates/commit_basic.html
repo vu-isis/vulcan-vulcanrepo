@@ -1,0 +1,6 @@
+{{ c.related_artifacts_widget.display(value=commit) }}
+{{ c.commit_widget.display(commit=commit, prev=prev, next=next) }}
+
+{% for blob in g.resource_manager.emit('js') %}
+{{ blob }}
+{% endfor %}

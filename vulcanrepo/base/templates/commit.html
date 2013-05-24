@@ -1,0 +1,24 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% block title %}
+  {{c.project.name}} / {{c.app.config.options.mount_label}} / Commit {{commit.shorthand_id()}}
+{% endblock %}
+
+{% block header -%}
+Commit <a href="{{commit.url()}}">{{commit.shorthand_id()}}</a>
+{%- endblock %}
+
+{% block actions %}
+{{g.icon_button_widget.display('History', None, None, 'ico-history', href=c.app.url + "history/" + commit.url_rev)}}
+{% endblock %}
+
+{% set has_related_artifacts = True %}
+
+{% block relatedArtifacts %}
+    {{c.related_artifacts_widget.display(value=commit)}}
+{% endblock %}
+
+{% block content %}
+    {{ clone_info(c.app.repo) }}
+    {{ c.commit_widget.display(commit=commit, prev=prev, next=next) }}
+{% endblock %}

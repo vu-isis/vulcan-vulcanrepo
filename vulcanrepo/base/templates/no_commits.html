@@ -1,0 +1,12 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% block header %}Empty Repository{% endblock %}
+
+{% block title %}Empty Repository{% endblock %}
+
+{% block content %}
+    {{ clone_info(c.app.repo) }}
+    {% if c.app.repo.status != "initializing" %}
+        <p class="padded"><i>This repository appears to be empty</i></p>
+    {% endif %}
+{% endblock %}

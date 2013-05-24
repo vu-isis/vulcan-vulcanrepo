@@ -1,0 +1,37 @@
+{% from 'vulcanforge.common:templates/master/lib.html' import email_gravatar, abbr_date with context %}
+<div>
+  <ul class="commit-log">
+    {% for commit in value %}
+        <li class="commit-log-item">
+          <div class="commit-date">
+            {% if commit.committed.date %}{{abbr_date(commit.committed.date)}}{% endif %}
+          </div>
+          <div class="inner">
+              <div class="commit-author">
+                  {{ c.commit_author_widget.display(commit.info(), size=48, load_user=True) }}
+              </div>
+              <div class="commit-summary">
+                  {{commit.summary}}
+              </div>
+              <div class="commit-username">
+                  {% if commit.user %} {{commit.user.display_name}} {% elif commit.authored.name %} {{commit.authored.name}} {% endif %}
+              </div>
+              <div class="commit-link">
+                  <a href="{{commit.url()}}" class="btn has-icon-after ico-arrow_right_alt1-after">[{{commit.shorthand_id()}}]</a>
+              </div>
+              <a class="commit-browse has-icon ico-play" href="{{ commit.tree.url() }}" title="Browse the code at this point in the repository">Browse code</a>
+                {% if path and path.endswith('/') and c.commit.object_id != commit.object_id %}
+                    <a class="commit-diff btn" href="{{ c.commit.url_for_method('diff') }}{{ path }}?diff={{ commit.url_rev }}">Diff</a>
+                {% endif %}
+          </div>
+        </li >
+      {% endfor %}
+    <div class="padded">
+        {% if page %}
+            <a class="ci_newer ci_nav btn" href="{{ c.commit.url_for_method('history') }}{{ path or '' }}?page={{ page - 1 }}&limit={{ limit }}">Newer</a>
+        {% endif %}
+        {% if count == limit %}
+            <a class="ci_older ci_nav btn" href="{{ c.commit.url_for_method('history') }}{{ path or '' }}?page={{ page + 1 }}&limit={{ limit }}">Older</a>
+        {% endif %}
+    </div>
+</div>

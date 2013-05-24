@@ -1,0 +1,40 @@
+{% extends g.templates['master'] %}
+
+{% block title %}{{c.project.name}} / {{c.app.config.options.mount_label}} / Fork {{c.app.repo.name}}{% endblock %}
+
+{% block header %}Fork {{c.app.config.options.mount_label}}{% endblock %}
+
+{% block content %}
+<div class="padded">
+    <p>
+        Create a copy of this repository in a project that you choose.
+        You must have the <em>Admin</em> role in that project and the repository name must be unique among its tools.
+    </p>
+    {% if not project_opts %}
+        <p class="warning_text">You are not an admin of any projects</p>
+    {% else %}
+        <form action="{{ c.app.url }}do_fork" method="POST">
+          <label class="grid-4">To Project:</label>
+          <div class="grid-15">
+            <select name="project_name">
+            {% for p in project_opts %}
+              <option value="{{p.shortname}}"{% if p.selected %} selected="selected"{% endif %}>{{p.name}}</option>
+            {% endfor %}
+            </select>
+          </div>
+          <label class="grid-4">Repository Label:</label>
+          <div class="grid-15">
+            <input type="text" name="to_label" value="{{to_label}}"/>
+          </div>
+          <label class="grid-4">Repository Name:</label>
+          <div class="grid-15">
+            <input type="text" name="to_name" value="{{to_name}}"/>
+          </div>
+          <label class="grid-4">&nbsp;</label>
+          <div class="grid-15">
+            <input type="submit" value="Fork"/>
+          </div>
+        </form>
+    {% endif %}
+    {% endblock %}
+</div>

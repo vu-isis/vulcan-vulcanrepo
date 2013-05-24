@@ -1,0 +1,31 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% block title %}
+{{c.project.name}} / {{c.app.config.options.mount_label}} / Diff of {{h.really_unicode(a.path)}}
+{% endblock %}
+
+{% block header %}Diff of
+<a href="{{b.url()}}">{{b.path}}</a>
+{% if a %}
+<a href="{{a.url()}}">{{a.commit.shorthand_id()}}</a>
+..
+<a href="{{b.url()}}">{{b.commit.shorthand_id()}}</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{{ clone_info(c.app.repo) }}
+<div class="grid-19" style="margin-bottom: 10px;">
+    {% if a %}
+    {{c.diff_widget.display(a=a, b=b)}}
+    {% else %}
+    File at past requested commit not found
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style type="text/css">
+    .clip h3 {margin-bottom: 0;}
+</style>
+{% endblock %}

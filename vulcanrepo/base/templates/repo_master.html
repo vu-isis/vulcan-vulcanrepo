@@ -1,0 +1,127 @@
+{% extends g.templates['master'] %}
+
+{% do g.resource_manager.register_css('artifact/artifact.scss', scope='tool') %}
+{% do g.resource_manager.register_css('repo/repo.scss', scope='tool') %}
+
+{% do g.resource_manager.register_js('js/lib/jquery/jquery.qtip.js', scope='tool') %}
+{% do g.resource_manager.register_js('artifact/Artifact.js', scope='tool') %}
+
+{% block before_content %}
+<div id="tutorialHolder"></div>
+{% endblock %}
+{% block extra_css %}
+    <link rel="alternate" type="application/rss+xml" title="RSS" href="{{c.app.url}}feed.rss"/>
+    <link rel="alternate" type="application/atom+xml" title="Atom" href="{{c.app.url}}feed.atom"/>
+{% endblock %}
+
+{% block extra_js %}
+<script type="text/javascript">
+
+    $(document).ready(function(){
+        $vf.afterInit(function() {
+
+            var repoStatus =  '{{c.app.repo.status}}';
+
+            $('select.access_type').change(function () {
+                $('#repo-access-url', $(this).parent()).val($('option:selected', $(this)).val());
+            }).change();
+
+            if ( repoStatus === 'initializing' ){
+                // adding please wait
+                var waitContainer = $('<div/>', {
+                    height: 380,
+                    width: 765
+                });
+                $('#main-column').append(waitContainer);
+                var ps = new $vf.PleaseWait('Initializing Repository', waitContainer);
+                $(this).hide();
+                ps.show();
+
+                //scheduling refresh
+                setTimeout( function() {
+                    location.reload();
+                }, 4000);
+            }
+        }, []);
+
+        $(function () {
+
+            var guideBookRelatedDescription = '',
+                description = '',
+                tutorial;
+
+            if ( $vf.vf_guidebook_location ) {
+                guideBookRelatedDescription = "<p><strong>New to version control?</strong> Learn how to get started in the <a href='" + $vf.vf_guidebook_location + "'>VehicleFORGE Guidebook</a>.</p>";
+            }
+            description = guideBookRelatedDescription +
+                    "<p><strong>Repositories are shared resources.</strong> It's usually a good idea to talk to your teammates when you make changes.</p>" +
+                    "<p><strong>Repositories keep a complete history.</strong> One way to keep your repository small and manageable is to only commit files you need.</p>";
+
+            tutorial = new $vf.Tutorial({
+                containerElement: $('#tutorialHolder'),
+                pageId: 'repo_master',
+                highlightTrigger: $('#tutorial-highlight-trigger'),
+                title: undefined,
+                description: description,
+                statePersistenceApiUrl: '/auth/prefs/state/'
+            });
+
+
+        });
+
+    });
+
+{% if c.app.repo.tool_name == "SVN" %}
+    $(function() {
+        var $container = $("#repo-access-urls"),
+            $urlInput = $("#repo-access-url");
+        $('<button><img src="{{ g.resource_manager.absurl('images/tsvn-16.png') }}"> Open</button>').
+            bind('click', function () {
+                window.location.href = 'tsvn:' + $urlInput.val();
+            }).
+            appendTo($container).
+            qtip({
+                content: {
+                    title: "Open with Tortoise",
+                    text: '<img src="{{ g.resource_manager.absurl('images/tsvn.png') }}" alt="Tortoise Logo" style="float:right; margin: 0 0 1em 1em">' +
+                        "<p>This requires the Tortoise SVN client to be installed on your computer.</p>" +
+                        '<p>It can be downloaded for Windows from <a href="http://tortoisesvn.net/">tortoisesvn.net</a></p>'
+                },
+                position: {
+                    my: 'top right',
+                    at: 'bottom right'
+                },
+                style: {
+                    classes: 'vf-tutorial-tip'
+                },
+                show: {
+                    event: 'mouseover',
+                    solo: true // Only show one tooltip at a time
+                },
+                hide: 'unfocus'
+            });
+    });
+{% endif %}
+
+</script>
+{% endblock %}
+
+{% macro clone_info(repo) %}
+  {% if repo %}
+    <div id="repo-access-urls" class="padded-block">
+       <label for="repo-access-url">repository url</label>
+       <select id="repo-access-type" class="access_type">
+        {% if h.has_access(c.app, 'write') or (c.user._id != c.user.anonymous()._id and h.has_access(c.app, 'read')) %}
+            {% if c.user.public_key %}
+            <option value="{{repo.clone_url('rw')}}">(SSH)</option>
+            {% endif %}
+            <option value="{{repo.clone_url('https')}}">(HTTPS)</option>
+        {% endif %}
+        {% if h.has_access(c.app, 'read', c.user.anonymous()) %}
+            <option value="{{repo.clone_url('ro')}}">(Anonymous HTTP)</option>
+        {% endif %}
+      </select>
+      <input id="repo-access-url" readonly type="text" class="selectText" value="" />
+    </div>
+   {% endif %}
+{% endmacro %}

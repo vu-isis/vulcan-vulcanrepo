@@ -1,0 +1,67 @@
+{{ revision_widget.display(value=commit, prev=prev, next=next) }}
+
+<div class="commit-diff">
+    <div class="commit-diff-list">
+        <table class="vf-table vf-commit-table">
+            <colgroup>
+                <col class="commit-action">
+                <col class="commit-file">
+            </colgroup>
+            <tbody class="commit-diffs-added">
+            {% for diff in commit.diffs.added %}
+                <tr class="commit-diff commit-diff-added" title="Added">
+                    <td class="commit-diff-action">
+                        <span class="basic-icon ico-added commit-diff-icon commit-diff-icon-added"><span class="hidden">added</span></span>
+                    </td>
+                    <td class="commit-diff-file">
+                        {% set method = 'folder' if diff.endswith('/') else 'file' %}
+                        <a href="{{commit.url_for_method(method) + h.really_unicode(diff)}}">{{ h.really_unicode(diff) }}</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tbody class="commit-diffs-removed">
+            {% for diff in commit.diffs.removed %}
+                {% set method = 'folder' if diff.endswith('/') else 'file' %}
+                <tr class="commit-diff commit-diff-removed" title="Removed">
+                    <td class="commit-diff-action">
+                        <span class="basic-icon ico-removed commit-diff-icon commit-diff-icon-removed"><span class="hidden">removed</span></span>
+                    </td>
+                    <td class="commit-diff-file">
+                        <a href="{{prev[0].url_for_method(method)}}{{h.really_unicode(diff)}}">{{ h.really_unicode(diff) }}</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tbody class="commit-diffs-changed">
+            {% for diff in commit.diffs.changed %}
+                {% set method = 'folder' if diff.endswith('/') else 'file' %}
+                <tr class="commit-diff commit-diff-changed" title="Changed">
+                    <td class="commit-diff-action">
+                        <span class="basic-icon ico-changed commit-diff-icon commit-diff-icon-changed"><span class="hidden">changed</span></span>
+                    </td>
+                    <td class="commit-diff-file">
+                        <a href="{{commit.url_for_method(method) + h.really_unicode(diff)}}">{{ h.really_unicode(diff) }}</a>
+                        <a href="{{commit.url_for_method('diff') + h.really_unicode(diff)}}?diff={{prev[0].url_rev}}">(diff)</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tbody class="commit-diffs-copied">
+            {% for diff in commit.diffs.copied %}
+                {% set method = 'folder' if diff.new.endswith('/') else 'file' %}
+                <tr class="commit-diff commit-diff-copied" title="Copied">
+                    <td class="commit-diff-action">
+                        <span class="basic-icon ico-copied commit-diff-icon commit-diff-icon-copied"><span class="hidden">copied</span></span>
+                    </td>
+                    <td class="commit-diff-file">
+                        <a href="{{prev[0].url_for_method(method)}}{{h.really_unicode(diff.old)}}">{{ h.really_unicode(diff.old) }}</a>
+                        <br/>to<br/>
+                        <a href="{{commit.url_for_method(method)}}{{h.really_unicode(diff.new)}}">{{ h.really_unicode(diff.new) }}</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

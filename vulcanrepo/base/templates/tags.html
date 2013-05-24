@@ -1,0 +1,16 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% block title %}
+    {{c.project.name}} / {{ c.app.config.options.mount_label }} / Tags
+{% endblock %}
+
+{% block header %}{{c.app.config.options.mount_label}} Tags{% endblock %}
+
+{% block content %}
+  {{ clone_info(c.app.repo) }}
+  <div class="padded">
+  {% for b in c.app.repo.repo_tags %}
+    <a class="tag-link" href="{{c.app.url}}folder/{{b.name}}">{{b.name}}</a><br>
+  {% endfor %}
+  </div>
+{% endblock %}

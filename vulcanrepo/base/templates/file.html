@@ -1,0 +1,48 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+{% set has_related_artifacts = True %}
+
+{% do g.resource_manager.register_css('visualize/vf_visualizer_embedder.scss') %}
+
+{% do g.resource_manager.register_js('visualize/visualizer.js') %}
+{% do g.resource_manager.register_js('visualize/VFVisualizerEmbedder.js') %}
+
+{% block title %}
+  {{c.project.name}} / {{c.app.config.options.mount_label}} /
+  {{c.commit.shorthand_id()}}
+  {{h.really_unicode(c.file.path)}}
+{% endblock %}
+
+{% block header %}
+    <a class="path_part repo-ci-link" href="{{c.commit.url()}}">{{c.commit.shorthand_id()}}</a>:
+        {% set path_parts = c.file.path.split('/')[1:-1] %}
+        {% for part in path_parts %}
+        <a class="path_part" href="{{c.app.url + 'folder/' + rev + '/' + '/'.join(path_parts[:loop.index]) }}">{{part}}</a> /
+        {% endfor %}
+    <span class="path_part">{{h.really_unicode(c.file.name)}}</span>
+{% endblock %}
+
+{% block actions %}
+    {{g.icon_button_widget.display('History', None, None, 'ico-history', href=c.file.url_for_method('history'), text="History")}}
+{% endblock %}
+
+{% block relatedArtifacts %}
+{{c.related_artifacts_widget.display(value=c.file)}}
+{% endblock %}
+
+{% block content %}
+  {{ clone_info(c.app.repo) }}
+  {% block filenav %}
+      {% if c.file.prev_commit %}
+          <div>
+              <p class="btn repo-nav-btn">
+                  <a href="{{ c.file.prev_commit.url_for_method('file') + c.file.path }}"
+                     class="repo-nav-link prev-link">Parent {{ c.file.prev_commit.shorthand_id() }} </a>|{#
+                   #}<a href="{{ c.file.url_for_method('diff') }}?diff={{ c.file.prev_commit.url_rev }}"
+                     class="repo-nav-link diff-link"> (diff)</a>
+              </p>
+          </div>
+      {% endif %}
+  {% endblock %}
+  {{c.visualizer_widget.display(value=c.file, context="repo", force=force_display, extra_params=extra_params)}}
+  {{c.thread.display(value=thread, title="Discussion", new_post_text="New Comment")}}
+{% endblock %}

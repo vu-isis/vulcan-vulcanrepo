@@ -1,0 +1,17 @@
+#graph_holder{
+    height:305px;
+    overflow:auto;
+    overflow-x:hidden;
+    position:relative;
+    box-shadow: inset 0 0 1ex rgba(0,0,0,0.2);
+    background: rgba(0,0,0,0.03);
+}
+#commit_highlighter, #commit_graph{
+    position:absolute;
+    top:0;
+    left:0;
+    z-index:0;
+}
+#commit_graph{
+    z-index: 1;
+}

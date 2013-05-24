@@ -1,0 +1,34 @@
+{% extends g.templates['master'] %}
+
+{% do g.resource_manager.register_css('css/deck.css') %}
+{% do g.resource_manager.register_css('repo/commithook.css') %}
+{% do g.resource_manager.register_js('repo/commithook.js') %}
+
+{% block title %}{{c.project.name}} / {{app.config.options.mount_label}} / Post Commit Hooks{% endblock %}
+
+{% block header %}{{app.config.options.mount_point}} Post Commit Hooks{% endblock %}
+
+{% block extra_js %}
+<script type="text/javascript">
+    $(document).ready(function(){
+        $vf.afterInit(function() {
+            var hookManager = new $vf.CommitHookManager({
+                addSL: new $vf.ServiceLocation("{{admin_url}}add_commit_hook", "POST"),
+                orderSL: new $vf.ServiceLocation("{{admin_url}}set_hook_order", "POST"),
+                removeSL: new $vf.ServiceLocation("{{admin_url}}remove_commit_hook", "POST"),
+                browsableSL: new $vf.ServiceLocation("{{admin_url}}browsable_hooks", "GET"),
+                runHooksOnAllCommitsSL: new $vf.ServiceLocation("{{admin_url}}run_hooks", "POST"),
+                runHooksOnLastCommitSL: new $vf.ServiceLocation("{{admin_url}}run_hooks", "POST"),
+                containerE: $('#hook-mgr-container'),
+                activeHooks: {{hooks_json|safe}},
+                autoLoad: true
+            });
+
+        }, []);
+    });
+</script>
+{{ super() }}
+{% endblock extra_js %}
+{% block content %}
+    <div id="hook-mgr-container" class="padded hook-mgr-container"></div>
+{% endblock %}

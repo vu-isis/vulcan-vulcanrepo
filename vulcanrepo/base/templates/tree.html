@@ -1,0 +1,212 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% do g.resource_manager.register_css('css/hilite.css') %}
+{% do g.resource_manager.register_css('assets/filebrowser/filebrowserwidget.css') %}
+
+{% do g.resource_manager.register_js('assets/filebrowser/filebrowserwidget.js') %}
+
+{% block extra_js %}
+    <script type="text/javascript">
+        var fbData = {{ data | jsonify }},
+            initPath = '{{ c.folder.path }}';
+
+        $vf.afterInit(function () {
+            var $fileBrowser = $('#fileBrowserWidget'),
+                filebrowser,
+                repoURL = "{{ c.app.repo.url() }}",
+                oid = "{{ c.commit.url_rev }}",
+                rev = "{{ rev }}",
+                readMeCache = {},
+                activeReadMe;
+
+            function renderReadMe(path) {
+                var pclass = 'rd-' + $vf.slugify(path.replace('/', '-')),
+                    readMeContainer = $('#readMeContainer');
+                if (activeReadMe){
+                    readMeContainer.find('.' + activeReadMe).hide();
+                }
+                if (readMeCache[pclass]){
+                    activeReadMe = readMeCache[pclass];
+                    readMeContainer.find('.' + activeReadMe).show();
+                } else {
+                    readMeContainer.append(
+                        $('<div class="' + pclass + '"/>').load(
+                            repoURL + 'readme/' + oid + path)
+                    );
+                    readMeCache[pclass] = activeReadMe = pclass;
+                }
+            }
+
+            function loadCommitInfo(data, path) {
+                var url, hasCommitInfo;
+                $.each(data, function(dp, pathData){
+                    if (dp !== path) {
+                        hasCommitInfo = pathData.extra && pathData.extra.commit ? true : false;
+                        return false;
+                    }
+                    return true;
+                });
+                if (hasCommitInfo === false){
+                    url = repoURL + 'dir_last_commits/' + oid + path;
+                    $.ajax({
+                        url: url,
+                        dataType: 'json',
+                        success: function(result){
+                            var li, dp,
+                                span_cls = filebrowser.option("classPrefix") + 'listItem-cell-commit';
+                            $.each(result.data, function(path, commitInfo){
+                                li = filebrowser._findListItemByPath(path);
+                                li.find('.' + span_cls).hide().html(commitInfo.extra.commit).fadeIn();
+                                filebrowser.data[path].extra.commit = commitInfo.extra.commit;
+                            });
+                        }
+                    });
+                }
+            }
+
+            $fileBrowser.bind({
+                'listpanel-created':function (event, params) {
+                    var that = params.filebrowser,
+                        $listInfoPanel;
+
+                    params.$listPanel.artifactLinkDroppable(function (artifactLink) {
+                        that.lockInterface("Working...");
+                        $.ajax({
+                            url:params.pathData.extra.forkUrl,
+                            type:"POST",
+                            data:{
+                                _session_id:$.cookie('_session_id'),
+                                dir_path:params.pathData.path,
+                                branch:params.pathData.extra.branch,
+                                artifact_ref:artifactLink.refId
+                            },
+                            dataType:"json",
+                            success:function (response) {
+                                document.location.href = response.url;
+                            },
+                            error:function () {
+                                alert('Operation failed');
+                                that.unlockInterface();
+                            }
+                        });
+                    });
+
+                    $listInfoPanel = $('<div/>').
+                        addClass('relatedArtifactsPanelHolder').
+                        html('<progress/>').
+                        prependTo(params.$listPanel);
+
+                    new $vf.ArtifactInfoPanel({
+                        parentClickURL:'',
+                        infoURL:'/artifact_ref/get_references/',
+                        refId:params.pathData.artifact.reference_id,
+                        containerE:$listInfoPanel,
+                        embedded:true
+                    });
+
+                    renderReadMe(params.pathData.path);
+                }
+            });
+
+            $fileBrowser.fileBrowser({
+                data: fbData,
+                assertions: true,
+                dataCacheTimeout: {{ 24 * 60 * 60 * 1000 }},
+                pageTitleFormat: "{{ c.project.name }} / " +
+                        "{{ c.app.config.options.mount_label }} / " +
+                        "{{ c.commit.shorthand_id() }} " +
+                        "{path}",
+
+                extraFields: ['commit', 'size', 'actions'],
+
+                initialPath: initPath,
+
+                getURLForPath: function (path) {
+                    var mount = path.substr(-1) == '/' ? 'folder/' : 'file/';
+                    return repoURL + mount + rev + path;
+                },
+
+                prepareRawPathData: function(rawData){
+                    var actionList = $('<p/>');
+                    if (!rawData.href){
+                        rawData.href = this.options.getURLForPath(rawData.path);
+                    }
+                    if (rawData.type == 'FILE'){
+                        $('<a/>', {
+                            'class': "ico-download icon",
+                            'title': "Download",
+                            'href': rawData.href + '?format=raw'
+                        }).appendTo(actionList);
+                    }
+                    rawData.extra.actions = actionList.html();
+                    return rawData;
+                },
+
+                getDataForPath: function (path, callback) {
+                    var dataURL = repoURL + 'folder/' + oid + path.slice(0, -1) + '.json',
+                        actionList;
+                    $.ajax({
+                        url: dataURL,
+                        dataType: 'json',
+                        success: function(result) {
+                            var data = result.data;
+                            callback(data);
+                            loadCommitInfo(data, path);
+                        },
+                        error: function () {
+                            /* if (this.getURLForPath(path) !== window.location.pathname) {
+                                window.location.href = url;
+                            } */
+                        }
+                    });
+                },
+
+                folderOperations: [
+                    function (pathData) {
+                        return $('<button>History</button>').
+                            addClass('inline-icon ico-history').
+                            attr('title', 'History').
+                            bind('click', function () {
+                                var path = pathData.path,
+                                    url = repoURL + 'history/' + rev + path;
+                                window.location.href = url;
+                            });
+                    }
+                ]
+            });
+
+            if (fbData){
+                loadCommitInfo(fbData, initPath);
+                renderReadMe(initPath);
+            }
+
+            filebrowser = $fileBrowser.data("fileBrowser");
+        });
+    </script>
+{{ super() }}
+{% endblock %}
+
+{% block title %}
+    {{ c.project.name }} / {{ c.app.config.options.mount_label }} / {{ c.commit.shorthand_id() }} {{ c.folder.path }}
+{% endblock %}
+
+{% block header %}
+    Browsing Commit <a class="repo-ci-link" href="{{c.commit.url()}}">{{ c.commit.shorthand_id() }}</a>
+{% endblock %}
+
+{% block actions %}
+{% if c.user and c.user != c.user.anonymous() %}
+    {{ g.subscription_popup_menu.display(feed_url=c.app.url + 'feed') }}
+{% endif %}
+{% endblock %}
+
+{% block edit_box %}{% endblock %}
+
+{% block content %}
+    <div class="padded top-spaced">
+        {{ clone_info(c.app.repo) }}
+        <div id="fileBrowserWidget"></div>
+        <div id="readMeContainer"></div>
+    </div>
+{% endblock %}
+

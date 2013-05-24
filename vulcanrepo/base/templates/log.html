@@ -1,0 +1,21 @@
+{% extends 'vulcanrepo.base:templates/repo_master.html' %}
+
+{% block title %}
+  {% if c.app.repo %}
+    Repository: {{c.app.repo.name}}
+  {% else %}
+    Repository
+  {% endif %}
+{% endblock %}
+
+{% block header %}Commit History from <span class="path_part"><a href="{{ c.app.url}}commit/{{ rev }}">[{{ rev }}]</a>{% if path %} for {{ path }}{% endif %}</span>{% endblock %}
+
+{% block content %}
+  {{ clone_info(c.app.repo) }}
+  <br style="clear:both"/>
+  {% if count %}
+    {{c.log_widget.display(value=log, path=path, limit=limit, page=page, count=count)}}
+  {% else %}
+    <p><b>No (more) commits</b></p>
+  {% endif %}
+{% endblock %}

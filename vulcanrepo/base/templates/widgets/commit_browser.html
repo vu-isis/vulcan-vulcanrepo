@@ -1,0 +1,10 @@
+<div id="graph_holder">
+  <canvas id="commit_highlighter" width="750" height="300"></canvas>
+  <canvas id="commit_graph" width="750" height="300"></canvas>
+</div>
+<div id="commit_view"><em>Select a commit to view details about it.</em></div>
+<script type="text/javascript">
+  var tree = {{built_tree|safe}};
+  var max_row = {{max_row}};
+  var next_column = {{next_column}};
+</script>

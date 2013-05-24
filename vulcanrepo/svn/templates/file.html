@@ -1,0 +1,11 @@
+{% extends 'vulcanrepo.base:templates/file.html' %}
+{% block filenav %}
+    {{ super() }}
+    {% if c.file.next_commit %}
+        <p>
+            Child:
+            <a href="{{ c.file.next_commit.url_for_method('file') + c.file.path[1:] }}">{{c.file.next_commit.shorthand_id() }}</a>
+            <a href="{{ c.file.url_for_method('diff') }}?diff={{ c.file.next_commit.url_rev }}">(diff)</a>
+        </p>
+    {% endif %}
+{% endblock %}

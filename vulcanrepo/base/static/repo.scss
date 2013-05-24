@@ -1,0 +1,141 @@
+@import "css/init.scss";
+
+/* Repo tool variable defaults.
+    ---
+    These will be overridden if present in theme
+*/
+/* icon colors */
+$repo-diff-added-color: #27AD50 !default;
+$repo-diff-removed-color: #C82515 !default;
+$repo-diff-changed-color: #FDCB2C !default;
+$repo-diff-copied-color: #0173BC !default;
+/* background colors */
+$repo-diff-added-background-color: #dceee1 !default;
+$repo-diff-removed-background-color: #f6dcdb !default;
+$repo-diff-changed-background-color: #fef5dc !default;
+$repo-diff-copied-background-color: #d6e8f4 !default;
+/* background hover colors */
+$repo-diff-added-hover-background-color: #cae6d2 !default;
+$repo-diff-removed-hover-background-color: #f1ccc8 !default;
+$repo-diff-changed-hover-background-color: #fdedba !default;
+$repo-diff-copied-hover-background-color: #c4ddee !default;
+/* */
+
+.commit-diff-action {
+  width: 2em;
+  text-align: center;
+}
+
+.commit-diff-icon {
+  text-shadow: 0 0 3px white;
+}
+.commit-diff-icon-added {color: $repo-diff-added-color;}
+.commit-diff-icon-removed {color: $repo-diff-removed-color;}
+.commit-diff-icon-changed {color: $repo-diff-changed-color;}
+.commit-diff-icon-copied {color: $repo-diff-copied-color;}
+
+tbody.commit-diffs-added {background-color: $repo-diff-added-background-color;}
+tbody.commit-diffs-removed {background-color: $repo-diff-removed-background-color;}
+tbody.commit-diffs-changed {background-color: $repo-diff-changed-background-color;}
+tbody.commit-diffs-copied {background-color: $repo-diff-copied-background-color;}
+
+tbody.commit-diffs-added tr:hover {background-color: $repo-diff-added-hover-background-color;}
+tbody.commit-diffs-removed tr:hover {background-color: $repo-diff-removed-hover-background-color;}
+tbody.commit-diffs-changed tr:hover {background-color: $repo-diff-changed-hover-background-color;}
+tbody.commit-diffs-copied tr:hover {background-color: $repo-diff-copied-hover-background-color;}
+
+/* Commit History page */
+
+ul.commit-log {
+  padding: 0;
+}
+
+li.commit-log-item {
+  list-style-type: none;
+  position: relative;
+  margin: 0 2ex 1.5ex;
+  padding: 0;
+  background: #F8F8F8;
+  border-radius: 1ex;
+  box-shadow: 0 2px 3px #e3e3e3;
+}
+
+li.commit-log-item .inner {
+  padding: 1ex 1ex 1ex 72px;
+  box-shadow: inset 0 0 2px #bababa;
+  border-bottom-left-radius: 1ex;
+  border-bottom-right-radius: 1ex;
+  position: relative;
+  min-height: 54px;
+}
+
+.commit-link {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
+
+.commit-link a.btn {
+  margin-right: 0;
+}
+
+.commit-browse {
+  position: absolute;
+  right: 8px;
+  top: 42px;
+  font-size: .9em;
+}
+
+.commit-browse.ico-play:before {
+  font-size: .75em;
+  position: relative;
+  top: -1px;
+}
+
+li.commit-log-item .inner:hover {
+  background-color: #fff;
+}
+
+.commit-date {
+  background-color: #ddd;
+  border-top-left-radius: 1ex;
+  border-top-right-radius: 1ex;
+  font-weight: bold;
+  padding: 1ex 2ex;
+  font-size: .9em;
+}
+
+.commit-summary {
+  font-weight: bold;
+  font-size: 1.1em;
+  padding-right: 90px;
+}
+
+.commit-author {
+  text-align: center;
+  width: 56px;
+  position: absolute;
+  top: 8px;
+  left: 8px;
+}
+
+.commit-username {
+  margin-top: 4px;
+}
+
+p.repo-nav-btn {
+  border-radius: 0;
+  margin-bottom: 5px;
+}
+
+p.repo-nav-btn:hover {
+  text-shadow: none;
+}
+
+p.repo-nav-btn a {
+  color: $button-color;
+}
+
+p.repo-nav-btn a:hover {
+  color: $button-hover-color;
+}
