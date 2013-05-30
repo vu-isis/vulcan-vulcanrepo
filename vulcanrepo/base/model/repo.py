@@ -21,7 +21,7 @@ from ming.odm.declarative import MappedClass
 
 from vulcanforge.common import helpers as h
 from vulcanforge.common.model.session import repository_orm_session
-from vulcanforge.common.tasks import index as index_tasks
+from vulcanforge.artifact.tasks import add_artifacts
 from vulcanforge.common.util import ConfigProxy
 from vulcanforge.artifact.model import (
     Artifact,
@@ -605,7 +605,7 @@ class Repository(Artifact):
         sess.clear()
 
         if ref_ids:
-            index_tasks.add_artifacts(ref_ids, update_solr=False)
+            add_artifacts(ref_ids, update_solr=False)
 
         log.info('Refreshed repository %s.', self)
         if update_status:

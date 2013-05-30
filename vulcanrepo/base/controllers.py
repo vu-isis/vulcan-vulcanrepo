@@ -82,14 +82,13 @@ def get_commit_and_obj(rev, *args, **kw):
     return commit, obj, rev
 
 
-class S3ProxyController(object):
+class S3ProxyController(BaseController):
     """Temporary until we figure out how to effectively serve static files"""
 
     @expose()
     def resource(self, *args, **kw):
         g.security.require_access(c.app, 'read')
-        key_name = get_path(args, use_ext=True)
-        key_name = h.urlquote(key_name)
+        key_name = get_path(map(h.urlquote, args), use_ext=True)
         LOG.info('getting repo s3 key at %s', key_name)
         try:
             key = g.s3_bucket.get_key(key_name)
