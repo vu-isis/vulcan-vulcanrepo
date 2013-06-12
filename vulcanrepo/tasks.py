@@ -46,7 +46,6 @@ def run_commit_hooks(commits=None):
 @task
 def uninstall(**kwargs):
     from vulcanrepo.base.app import RepositoryApp
-
     repo = c.app.repo
     if repo is not None:
         shutil.rmtree(repo.full_fs_path, ignore_errors=True)

@@ -116,6 +116,9 @@ class RepositoryApp(Application):
         '*authenticated': ['post', 'unmoderated_post'],
         '*anonymous': ['read']
     }
+    tasks = {
+        'uninstall': uninstall_task
+    }
 
     def __init__(self, project, config):
         Application.__init__(self, project, config)
@@ -212,7 +215,7 @@ class RepositoryApp(Application):
         super(RepositoryApp, self).install(project, acl=acl)
 
     def uninstall(self, project=None, project_id=None):
-        uninstall_task.post()
+        self.tasks['uninstall'].post()
 
     def _get_default_post_commits(self):
         pchs = []
