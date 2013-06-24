@@ -4,9 +4,10 @@ import bson
 from ming import schema as S
 from ming.odm import FieldProperty, ThreadLocalODMSession
 from ming.odm.declarative import MappedClass
-
 from vulcanforge.auth.schema import ACL
 from vulcanforge.common.model.session import repository_orm_session
+
+from vulcanrepo.tasks import purge_hook
 
 
 class PostCommitHook(MappedClass):
@@ -28,6 +29,10 @@ class PostCommitHook(MappedClass):
     @classmethod
     def from_object(cls, object, **kwargs):
         return cls(cls=bson.Binary(dumps(object)), **kwargs)
+
+    def delete(self):
+        purge_hook.post(self._id)
+        super(PostCommitHook, self).delete()
 
     def run(self, commits, args=(), kwargs=None):
         if not args:

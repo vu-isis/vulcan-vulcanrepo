@@ -6,6 +6,7 @@ from .repo import (
     RepoAlternate,
     RepoCommitPathSpec,
     RepoVersionSpec,
-    RepoContentRelation
+    RepoContentRelation,
+    RepositoryThread
 )
 from .hook import PostCommitHook
