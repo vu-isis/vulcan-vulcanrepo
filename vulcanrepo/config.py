@@ -1,5 +1,5 @@
 NAMESPACED_STATIC_DIRS = {
-    "repo": "vulcanrepo:base/static"
+    "repo": ["vulcanrepo:base/static"]
 }
 
 REPO_TOOL_SPEC = {
