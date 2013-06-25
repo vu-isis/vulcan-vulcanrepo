@@ -435,9 +435,15 @@ class Repository(Artifact):
             'scm.domain.{}'.format(self.repo_id),
             tg.config.get('scm.domain', 'localhost')
         )
+        port_defaults = {
+            'http': "80",
+            'ssh': "22",
+            'https': "443"
+        }
+        scheme = scheme_map[category]
         port = tg.config.get(
-            'scm.port.{}.{}'.format(scheme_map[category], self.repo_id),
-            'scm.port.{}'.format(scheme_map[category])
+            'scm.port.{}.{}'.format(scheme, self.repo_id),
+            tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme])
         )
         return self.url_map[category].format(
             host='{}:{}'.format(domain, port),

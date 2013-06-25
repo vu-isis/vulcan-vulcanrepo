@@ -613,9 +613,9 @@ class RepoWebServiceAuthController(WebServiceAuthController):
     @expose('json')
     def repo_permissions(self, repo_path=None, username=None, **kw):
         """Expects repo_path to be a filesystem path like
-            <tool>/<project>.<neighborhood>/reponame[.git]
+            <tool_type>/<project>.<neighborhood>/<mount_point>[.git]
         unless the <neighborhood> is 'p', in which case it is
-            <tool>/<project>/reponame[.git]
+            <tool_type>/<project>/<mount_point>[.git]
 
         Returns JSON describing this user's permissions on that repo.
         """
