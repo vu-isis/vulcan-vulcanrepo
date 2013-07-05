@@ -96,7 +96,7 @@ class RepositoryApp(Application):
         48: 'images/code_48.png'
     }
     default_hooks = {
-        "post_commit": ["dmdref"]
+        "post_commit": []
     }
     reference_opts = dict(Application.reference_opts, can_reference=True)
     admin_description = (

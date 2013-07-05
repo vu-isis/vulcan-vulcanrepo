@@ -178,9 +178,9 @@ class GitRepository(Repository):
     type_s = 'Git Repository'
     url_map = {
         'ro': 'git://git.{host}{path}',
-        'rw': 'ssh://{username}@{host}/scm-repo{path}',
-        'https': 'https://{username}@{host}/scm-repo{path}',
-        'https_anon': 'https://{host}/scm-repo{path}'
+        'rw': 'ssh://{username}@{host}{path}',
+        'https': 'https://{username}@{host}{path}',
+        'https_anon': 'https://{host}{path}'
     }
 
     branches = FieldProperty(

@@ -201,9 +201,9 @@ class SVNRepository(Repository):
     MAX_MEM_READ = 50 * 10 ** 6
     url_map = {
         'ro': 'http://svn.{host}{path}/trunk',
-        'rw': 'svn+ssh://{username}@{host}/scm-repo{path}/trunk',
-        'https': 'https://{username}@{host}/scm-repo{path}/trunk',
-        'https_anon': 'https://{host}/scm-repo{path}/trunk'
+        'rw': 'svn+ssh://{username}@{host}{path}/trunk',
+        'https': 'https://{username}@{host}{path}/trunk',
+        'https_anon': 'https://{host}{path}/trunk'
     }
 
     @LazyProperty
