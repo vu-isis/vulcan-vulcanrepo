@@ -12,7 +12,6 @@
 
         $vf.afterInit(function () {
             var $fileBrowser = $('#fileBrowserWidget'),
-                filebrowser,
                 repoURL = "{{ c.app.repo.url() }}",
                 oid = "{{ c.commit.url_rev }}",
                 rev = "{{ rev }}",
@@ -38,7 +37,8 @@
             }
 
             function loadCommitInfo(data, path) {
-                var url, hasCommitInfo;
+                var url, hasCommitInfo,
+                    filebrowser = $fileBrowser.data("fileBrowser");
                 $.each(data, function(dp, pathData){
                     if (dp !== path) {
                         hasCommitInfo = pathData.extra && pathData.extra.commit ? true : false;
@@ -174,8 +174,6 @@
                     }
                 ]
             });
-
-            filebrowser = $fileBrowser.data("fileBrowser");
 
             if (fbData){
                 loadCommitInfo(fbData, initPath);
