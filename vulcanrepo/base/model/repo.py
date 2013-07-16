@@ -67,6 +67,15 @@ class RepositoryContent(ArtifactApiMixin):
         self.commit = commit
         self.path = path
 
+    def __eq__(self, other):
+        if other.__class__ == self.__class__:
+            return (self.path == other.path and
+                    self.commit.object_id == other.commit.object_id)
+        return False
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
+
     @property
     def repo(self):
         return self.commit.repo
@@ -99,18 +108,18 @@ class RepositoryContent(ArtifactApiMixin):
         return self.commit.url_for_method(method) + self.path
 
     def link_text_short(self):
-        return self.name if self.name else '/'
+        return self.name if self.name else u'/'
 
     def shorthand_id(self):
-        return '({}){}'.format(self.commit.shorthand_id(), self.path)
+        return u'({}){}'.format(self.commit.shorthand_id(), self.path)
 
     def index_id(self):
-        return 'Repo.{}.{}.{}'.format(
+        return u'Repo.{}.{}.{}'.format(
             self.app_config_id, self.commit.object_id, self.path)
 
     @property
     def cache_name(self):
-        return '.'.join((
+        return u'.'.join((
             str(self.app_config_id),
             self.version_id,  # mixins should apply this (do not add here)
             self.path
@@ -198,7 +207,9 @@ class RepositoryFile(RepositoryContent):
         raise NotImplementedError('get_content_hash')
 
     def get_discussion_thread(self, data=None, generate_if_missing=True):
-        t = RepositoryThread.query.get(ref_id=self.path)
+        t = RepositoryThread.query.get(
+            ref_id=self.path,
+            discussion_id=self.app_config.discussion_id)
         if t is None and generate_if_missing:
             t = RepositoryThread(
                 discussion_id=self.app_config.discussion_id,
@@ -433,8 +444,7 @@ class Repository(Artifact):
         }
         domain = tg.config.get(
             'scm.domain.{}'.format(self.repo_id),
-            tg.config.get('scm.domain', 'localhost')
-        )
+            tg.config.get('scm.domain', 'localhost'))
         port_defaults = {
             'http': "80",
             'ssh': "22",
@@ -443,10 +453,10 @@ class Repository(Artifact):
         scheme = scheme_map[category]
         port = tg.config.get(
             'scm.port.{}.{}'.format(scheme, self.repo_id),
-            tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme])
-        )
+            tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme]))
+        port_str = ':{}'.format(port) if port != port_defaults[scheme] else ''
         return self.url_map[category].format(
-            host='{}:{}'.format(domain, port),
+            host=domain + port_str,
             path=self.url_path + self.url_name,
             username=username
         )
@@ -782,7 +792,7 @@ class Commit(Artifact):
 
     @property
     def notification_message(self):
-        return '{} by {} <{}{}>'.format(
+        return u'{} by {} <{}{}>'.format(
             h.really_unicode(self.summary),
             h.really_unicode(self.committed.name),
             config.common_prefix,

@@ -68,11 +68,11 @@ def get_commit(rev, args, depth=10):
 
 
 def get_path(args, use_ext=False):
-    path = '/' + '/'.join(args)
+    path = ('/' + '/'.join(args)).decode('utf8')
     if use_ext:
         request_ext = request.response_ext
         if request_ext and not path.endswith(request_ext):
-            path += request.response_ext
+            path += unicode(request.response_ext)
     return path
 
 
@@ -243,7 +243,7 @@ class BaseRepositoryController(BaseController):
                 author_content = self.Widgets.commit_author_widget.display(
                     last_commit)
                 commit_text = (
-                    '{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
+                    u'{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
                         author_content, **last_commit)
 
             data[path] = {

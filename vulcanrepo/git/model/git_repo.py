@@ -46,10 +46,10 @@ def make_content_object(obj, ci):
     """
     result = None
     if obj.type == 'blob':
-        result = GitFile(ci, '/' + obj.path)
+        result = GitFile(ci, u'/' + obj.path)
         result._obj = obj
     elif obj.type == 'tree':
-        result = GitFolder(ci, '/' + obj.path)
+        result = GitFolder(ci, u'/' + obj.path)
         result._obj = obj
     return result
 
@@ -117,15 +117,15 @@ class GitCommit(Commit):
 
     @LazyProperty
     def tree(self):
-        return GitFolder(self, '/')
+        return GitFolder(self, u'/')
 
     def get_obj_from_path(self, path):
-        path = path.strip('/')
+        path = path.strip(u'/')
 
         if not path:
             return self._obj.tree
 
-        rev = '{}:{}'.format(self.object_id, path)
+        rev = u'{}:{}'.format(self.object_id, path)
         try:
             obj = self.repo.git_repo.rev_parse(rev)
         except KeyError:
@@ -133,7 +133,7 @@ class GitCommit(Commit):
         return obj
 
     def get_path(self, path):
-        if path == '/':
+        if path == u'/':
             return self.tree
 
         obj = self.get_obj_from_path(path)
@@ -469,7 +469,8 @@ class GitContentMixin(object):
         oid = None
         try:
             oids = self.repo.git_repo.git.rev_list(
-                '-2', self.commit.object_id, '--', self.path[1:]).split('\n')
+                '-2', self.commit.object_id,
+                '--', self.path[1:].encode('utf8')).split('\n')
         except git.GitCommandError:  # pragma no cover
             pass
         else:

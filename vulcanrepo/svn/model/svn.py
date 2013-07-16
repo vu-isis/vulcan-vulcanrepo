@@ -200,10 +200,10 @@ class SVNRepository(Repository):
     type_s = 'SVN Repository'
     MAX_MEM_READ = 50 * 10 ** 6
     url_map = {
-        'ro': 'http://svn.{host}{path}/trunk',
-        'rw': 'svn+ssh://{username}@{host}{path}/trunk',
-        'https': 'https://{username}@{host}{path}/trunk',
-        'https_anon': 'https://{host}{path}/trunk'
+        'ro': 'http://svn.{host}{path}',
+        'rw': 'svn+ssh://{username}@{host}{path}',
+        'https': 'https://{username}@{host}{path}',
+        'https_anon': 'https://{host}{path}'
     }
 
     @LazyProperty
@@ -344,21 +344,21 @@ class SVNRepository(Repository):
             pysvn.opt_revision_kind.number,
             ci.commit_num - 1)
         for path in log_entry.changed_paths:
-            p = path.path
+            path_str = h.really_unicode(path.path)
             rev = parent_rev if path.action == 'D' else ci.svn_revision
-            is_file = self._is_file(p, rev)
+            is_file = self._is_file(path_str, rev)
             if not is_file:
-                p += '/'
+                path_str += u'/'
             if path.copyfrom_path:
-                from_p = path.copyfrom_path
+                from_p = h.really_unicode(path.copyfrom_path)
                 if not is_file:
-                    from_p += '/'
+                    from_p += u'/'
                 ci.diffs.copied.append({
-                    'old': h.really_unicode(from_p),
-                    'new': h.really_unicode(p)
+                    'old': from_p,
+                    'new': path_str
                 })
             else:
-                lst[path.action].append(h.really_unicode(p))
+                lst[path.action].append(path_str)
 
     def _is_file(self, path, rev=None):
         l_info = self.svn.list(
