@@ -446,7 +446,9 @@ class Repository(Artifact):
             tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme])
         )
         return self.url_map[category].format(
-            host='{}:{}'.format(domain, port),
+            host='{}'.format(domain, port),
+            domain=domain,
+            port=port,
             path=self.url_path + self.url_name,
             username=username
         )
