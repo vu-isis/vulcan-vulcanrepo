@@ -121,7 +121,7 @@ class RepoStatsController(BaseController):
     @cache_rendered(timeout=STATS_CACHE_TIMEOUT)
     @validate(CommitQuerySchema())
     def commit_aggregate(self, date_start=None, date_end=None, bins=None,
-                         order=None, label=None, user=None, **extra_query):
+                         order=None, label=None, user=None):
         if bins is None:
             bins = ['daily']
         agg = CommitAggregator(
@@ -131,8 +131,7 @@ class RepoStatsController(BaseController):
             repo=c.app.repo,
             order=order,
             label=label,
-            user=user,
-            extra_query=extra_query
+            user=user
         )
         agg.run()
         return agg.fix_results()
