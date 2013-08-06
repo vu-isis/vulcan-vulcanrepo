@@ -306,7 +306,7 @@ class SVNRepository(Repository):
             return oids
         cursor = SVNCommit.query.find({'repository_id': self._id})
         seen_oids = set(ci.object_id for ci in cursor)
-        return list(set(oids).difference(seen_oids))
+        return sorted(list(set(oids).difference(seen_oids)))
 
     def refresh_commit(self, ci):
         rev = ci.svn_revision

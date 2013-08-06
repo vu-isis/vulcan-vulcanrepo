@@ -15,7 +15,7 @@ from pylons import tmpl_context as c, app_globals as g
 import pymongo.errors
 from ming import schema as S
 from ming.utils import LazyProperty
-from ming.odm import FieldProperty, RelationProperty, session
+from ming.odm import FieldProperty, RelationProperty, session, state
 from ming.odm.property import ORMProperty, ManyToOneJoin
 from ming.odm.declarative import MappedClass
 
@@ -578,7 +578,7 @@ class Repository(Artifact):
 
         commit_msgs = []
         ref_ids = []
-        new_commit_ids = set()
+        new_commit_ids = []
         lc = None
 
         # Add commit objects to the db
@@ -604,7 +604,7 @@ class Repository(Artifact):
                 self.post_commit_feed(ci)
                 commit_msgs.append(ci.notification_message)
 
-            new_commit_ids.add(oid)
+            new_commit_ids.append(oid)
 
         if notify and commit_msgs:
             self.notify_commits(commit_msgs, last_commit=lc)
@@ -625,10 +625,11 @@ class Repository(Artifact):
             if all_commits:
                 self.run_batched_post_commit_hooks()
             else:
-                new_commits = self.commit_cls.query.find({
-                    'repository_id': self._id,
-                    'object_id': {'$in': list(new_commit_ids)}
-                }).all()
+                # do individual queries to maintain order
+                new_commits = [
+                    self.commit_cls.query.get(
+                        repository_id=self._id, object_id=oid)
+                    for oid in new_commit_ids]
                 self.run_post_commit_hooks(new_commits)
 
         return len(commit_ids)
@@ -931,6 +932,12 @@ class RepoContentRelation(RelationProperty):
             raise RepoNoJoin('Cannot find repo spec property for {}'.format(
                 self.mapper.mapped_class))
         return prop
+
+    def __set__(self, instance, value):
+        super(RepoContentRelation, self).__set__(instance, value)
+        if self.fetch:
+            st = state(instance)
+            st.extra_state[self] = value
 
     @LazyProperty
     def join(self):

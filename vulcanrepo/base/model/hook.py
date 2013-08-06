@@ -4,7 +4,9 @@ import bson
 from ming import schema as S
 from ming.odm import FieldProperty, ThreadLocalODMSession
 from ming.odm.declarative import MappedClass
+from pylons import tmpl_context as c
 from vulcanforge.auth.schema import ACL
+from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
 
 from vulcanrepo.tasks import purge_hook
@@ -55,3 +57,47 @@ class PostCommitHook(MappedClass):
 
     def parent_security_context(self):
         return None
+
+
+# Base Objects
+class Plugin(object):
+    """base object for post commit plugins"""
+    arg_type = None
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def condition(self, target):
+        return True
+
+    def has_ext(self, obj, ext):
+        return obj.name.endswith('.' + ext)
+
+    def get_user_for_commit(self, commit):
+        user = None
+        email = commit.authored['email']
+        if email:
+            u = User.by_email_address(email)
+            if u and c.project.user_in_project(user=u):
+                user = u
+        return user
+
+
+class CommitPlugin(Plugin):
+    """base object for post commit plugins that accepts a single commit"""
+    arg_type = "commit"
+
+    def on_submit(self, commit):
+        pass
+
+
+class MultiCommitPlugin(Plugin):
+    """base object for post commit plugins that accept multiple commits"""
+    arg_type = "multicommit"
+
+    def on_submit(self, commits):
+        pass
+
+
+class PostCommitError(Exception):
+    pass
