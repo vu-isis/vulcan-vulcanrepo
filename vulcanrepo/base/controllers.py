@@ -258,6 +258,22 @@ class BaseRepositoryController(BaseController):
 
         return {'data': data}
 
+    @expose('json')
+    def last_commit(self, rev, *args, **kwargs):
+        """
+        returns {
+            "date": commit.authored.date,
+            "author_name": commit.authored.name,
+            "author_email": commit.authored.email,
+            "id": commit.object_id,
+            "href": commit.url(),
+            "shortlink": commit.shorthand_id(),
+            "summary": commit.summary
+        }
+        """
+        c.commit, c.obj, rev = get_commit_and_obj(rev, *args)
+        return c.obj.get_last_commit().info()
+
     @expose(TEMPLATE_DIR + 'readme.html')
     def readme(self, rev, *args, **kwargs):
         commit, folder, rev = get_commit_and_obj(rev, *args)
