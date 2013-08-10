@@ -82,6 +82,19 @@ class Plugin(object):
                 user = u
         return user
 
+    def get_modded_paths(self, commit):
+        # find modded file paths
+        modded_paths = []
+        for path in commit.paths_added.union(commit.diffs.changed):
+            if path.endswith('/'):
+                repo_dir = commit.get_path(path)
+                for child in repo_dir.find_files():
+                    if child.path not in modded_paths:
+                        modded_paths.append(child.path)
+            elif path not in modded_paths:
+                modded_paths.append(path)
+        return modded_paths
+
 
 class CommitPlugin(Plugin):
     """base object for post commit plugins that accepts a single commit"""
