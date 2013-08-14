@@ -163,7 +163,7 @@ class RepositoryFile(RepositoryContent):
     def get_alt_resource(self, key, **kw):
         if self.alt_object:
             r = self.alt_object.get_alt_url(key)
-            if isinstance(r, dict):
+            if isinstance(r, dict) and 'key' in r:
                 r = '{}_s3_proxy/resource/{}'.format(self.repo.url(), r['key'])
             return r
 
@@ -172,6 +172,7 @@ class RepositoryFile(RepositoryContent):
             url = ArtifactApiMixin._process_alt_file(self, file, **kw)
         self.alt_object = RepoAlternate.upsert(self)
         self.alt_object.resources[key] = url
+        self.alt_object.loading = False
         if not self.alt_object.content_hash:
             self.alt_object.content_hash = self.get_content_hash()
         if flush:
