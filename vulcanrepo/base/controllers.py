@@ -4,6 +4,7 @@ import logging
 import tempfile
 import urllib
 import cgi
+from markupsafe import Markup
 
 from ming.odm import session
 from vulcanforge.auth.model import User
@@ -31,6 +32,7 @@ from vulcanforge.artifact.controllers import (
 from vulcanforge.artifact.model import Feed, ArtifactReference
 from vulcanforge.artifact.widgets import RelatedArtifactsWidget
 from vulcanforge.cache.decorators import cache_rendered
+from vulcanforge.config.render.jsonify import JSONSafe
 from vulcanforge.discussion.controllers import AppDiscussionController
 import vulcanforge.discussion.widgets
 from vulcanforge.neighborhood.model import Neighborhood
@@ -207,7 +209,7 @@ class BaseRepositoryController(BaseController):
             if g.cache:
                 g.cache.hset_json(c.folder.cache_name, 'tree_json', data)
 
-        return dict(rev=rev, data=data)
+        return dict(rev=rev, data=JSONSafe(data))
 
     @expose('json')
     def dir_last_commits(self, rev, *args, **kwargs):
@@ -228,7 +230,9 @@ class BaseRepositoryController(BaseController):
                         paths.append(path[path_i:])
                     else:
                         data[path] = {
-                            'extra': {'commit': info['extra']['commit']}
+                            'extra': {
+                                'commit': Markup(info['extra']['commit'])
+                            }
                         }
                 if not paths:  # we have all the info we need
                     return {'data': data}
@@ -246,7 +250,7 @@ class BaseRepositoryController(BaseController):
                         author_content, **last_commit)
 
             data[path] = {
-                'extra': {'commit': commit_text}
+                'extra': {'commit': Markup(commit_text)}
             }
             if cache_result:
                 tree_data[path].setdefault('extra', {})
