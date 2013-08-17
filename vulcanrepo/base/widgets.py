@@ -1,8 +1,10 @@
-import ew as ew_core
 import cgi
 
+import ew as ew_core
+from formencode import Invalid
 from pylons import app_globals as g
 from jinja2.utils import Markup
+from vulcanforge.common.validators import EmailValidator
 
 from vulcanforge.common.widgets.util import PageList, PageSize
 from vulcanforge.resources.widgets import JSLink, CSSLink
@@ -84,6 +86,10 @@ class CommitAuthorWidget(ew_core.Widget):
                     author_content = self.avatar_widget.display(
                         user=user, size=size, compact=True)
             if not author_content:
+                try:
+                    EmailValidator().to_python(value['author_email'], None)
+                except Invalid:
+                    return ''
                 author_content = (
                     '<img class="emboss x{size}" src="{src}" '
                     'alt="{author}" title="{author}" />').format(

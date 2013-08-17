@@ -1,6 +1,7 @@
 """
 Basic model for repositories
 """
+import cgi
 import os
 import errno
 import logging
@@ -71,10 +72,15 @@ class RepositoryContent(ArtifactApiMixin):
     def repo(self):
         return self.commit.repo
 
-    def ls_entry(self):
+    def ls_entry(self, escape=False):
+        name = h.really_unicode(self.name)
+        path = self.path
+        if escape:
+            name = cgi.escape(name)
+            path = cgi.escape(path)
         return {
-            "name": h.really_unicode(self.name),
-            "path": self.path,
+            "name": name,
+            "path": path,
             "href": self.url(),
             "type": "FILE" if self.kind == "File" else "DIR",
             "artifact": {
@@ -141,8 +147,8 @@ class RepositoryFile(RepositoryContent):
     def open(self):
         raise NotImplementedError('open')
 
-    def ls_entry(self):
-        entry = super(RepositoryFile, self).ls_entry()
+    def ls_entry(self, escape=False):
+        entry = super(RepositoryFile, self).ls_entry(escape=escape)
         entry.update({
             "downloadURL": self.raw_url(),
             'size': self.size
@@ -253,9 +259,9 @@ class RepositoryFolder(RepositoryContent):
             if obj.kind == 'File':
                 yield obj
 
-    def ls(self, include_self=False):
+    def ls(self, include_self=False, escape=False):
         objs = chain([self], iter(self)) if include_self else iter(self)
-        return [obj.ls_entry() for obj in objs]
+        return [obj.ls_entry(escape=escape) for obj in objs]
 
     def get_from_path(self, path):
         full_path = os.path.normpath(os.path.join(self.path, path))

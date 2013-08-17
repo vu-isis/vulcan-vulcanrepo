@@ -170,7 +170,7 @@ class BaseRepositoryController(BaseController):
             return '%r refresh queued.\n' % c.app.repo
 
     @expose(TEMPLATE_DIR + 'tree.html')
-    @expose('json')
+    @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
         if c.folder.kind == 'File':
@@ -183,7 +183,11 @@ class BaseRepositoryController(BaseController):
         else:
             data = {}
 
-        if not data:
+        if data:
+            for path, entry in data.iteritems():
+                if 'commit' in entry.get('extra', {}):
+                    entry['extra']['commit'] = Markup(entry['extra']['commit'])
+        else:
             for entry in c.folder.ls(include_self=True):
                 entry.setdefault('extra', {})
                 entry['extra']['forkUrl'] = '{}_modify/fork_artifact'.format(
@@ -211,7 +215,7 @@ class BaseRepositoryController(BaseController):
 
         return dict(rev=rev, data=JSONSafe(data))
 
-    @expose('json')
+    @expose('json', render_params={"sanitize": False})
     def dir_last_commits(self, rev, *args, **kwargs):
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
         data = {}
@@ -247,7 +251,11 @@ class BaseRepositoryController(BaseController):
                     last_commit)
                 commit_text = (
                     '{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
-                        author_content, **last_commit)
+                        author_content,
+                        summary=cgi.escape(last_commit['summary']),
+                        shortlink=last_commit['shortlink'],
+                        href=last_commit['href']
+                )
 
             data[path] = {
                 'extra': {'commit': Markup(commit_text)}
