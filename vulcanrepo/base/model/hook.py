@@ -1,15 +1,21 @@
-from cPickle import dumps, loads
+import logging
 import bson
+import os
+import json
 
 from ming import schema as S
-from ming.odm import FieldProperty, ThreadLocalODMSession
+from ming.odm import FieldProperty, ThreadLocalODMSession, session
 from ming.odm.declarative import MappedClass
 from pylons import tmpl_context as c
 from vulcanforge.auth.schema import ACL
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
+from vulcanforge.common.util.filesystem import import_object
+from vulcanforge.visualize.model import Visualizer
 
 from vulcanrepo.tasks import purge_hook
+
+LOG = logging.getLogger(__name__)
 
 
 class PostCommitHook(MappedClass):
@@ -23,14 +29,22 @@ class PostCommitHook(MappedClass):
     description = FieldProperty(str, if_missing='')
     removable = FieldProperty(bool, if_missing=True)
     wants_all = FieldProperty(bool, if_missing=False)
-    cls = FieldProperty(S.Binary)
+    hook_cls = FieldProperty(S.Object({
+        'module': str,
+        'classname': str
+    }))
     default_args = FieldProperty([None])
     default_kwargs = FieldProperty({str: None})
     acl = FieldProperty(ACL(permissions=['install', 'read']))
 
     @classmethod
-    def from_object(cls, object, **kwargs):
-        return cls(cls=bson.Binary(dumps(object)), **kwargs)
+    def from_object(cls, obj, **kwargs):
+        return cls(
+            hook_cls={
+                "module": obj.__module__,
+                "classname": obj.__class__.__name__
+            },
+            **kwargs)
 
     def delete(self):
         purge_hook.post(self._id)
@@ -42,7 +56,8 @@ class PostCommitHook(MappedClass):
         full_kw = self.default_kwargs.copy()
         if kwargs:
             full_kw.update(kwargs)
-        cls = loads(str(self.cls))
+        path = '{}:{}'.format(self.hook_cls.module, self.hook_cls.classname)
+        cls = import_object(path)
         plugin = cls(*args, **full_kw)
         self._run_plugin(plugin, commits)
 
@@ -114,3 +129,66 @@ class MultiCommitPlugin(Plugin):
 
 class PostCommitError(Exception):
     pass
+
+
+class VisualizerManager(MultiCommitPlugin):
+    """This is a bit inefficient, but is the easiest way to sync"""
+
+    def __init__(self, visualizer_shortname, restrict_branch_to='master',
+                 **kw):
+        self.visualizer = Visualizer.query.get(
+            shortname=visualizer_shortname)
+        if not self.visualizer:
+            self.visualizer = Visualizer(shortname=visualizer_shortname)
+        self.restrict_branch_to = restrict_branch_to
+        super(VisualizerManager, self).__init__()
+
+    def is_valid_branch(self, commit):
+        valid = True
+        if commit.repo.type_s == 'Git Repository' and self.restrict_branch_to:
+            valid = self.restrict_branch_to in commit.branches()
+        return valid
+
+    def init_from_commit(self, commit):
+        bundle_content = []
+        self.visualizer.delete_s3_keys()
+
+        # find the manifest
+        for obj in commit.tree.walk(ignore=['.git', '.svn']):
+            if obj.name == 'manifest.json':
+                manifest_json = json.loads(obj.open().read())
+                root_path = os.path.dirname(obj.path)
+                break
+        else:
+            manifest_json = None
+            root_path = '/'
+
+        # update from manifest
+        if manifest_json:
+            self.visualizer.update_from_manifest(manifest_json)
+
+        # upload all files
+        root_dir = commit.get_path(root_path)
+        for obj in root_dir.walk(ignore=['.git', '.svn']):
+            if obj.kind == 'File':
+                path = os.path.relpath(obj.path, root_path)
+                if self.visualizer.can_upload(path):
+                    LOG.info('adding {} to visualizer content'.format(path))
+                    bundle_content.append(path)
+                    key = self.visualizer.get_s3_key(path)
+                    key.set_contents_from_string(obj.open().read())
+
+        self.visualizer.bundle_content = bundle_content
+        LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
+        session(Visualizer).flush(self.visualizer)
+        LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
+
+    def on_submit(self, commits):
+        #if not self.visualizer.bundle_content:
+        for commit in commits[::-1]:
+            if self.is_valid_branch(commit):
+                self.init_from_commit(commit)
+                break
+        else:
+            # no commit found on valid branch
+            return
