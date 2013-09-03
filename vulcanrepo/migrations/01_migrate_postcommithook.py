@@ -23,7 +23,7 @@ class MigrateCommitHook(BaseMigration):
                             pch['cls']))
             pch['hook_cls'] = {
                 'module': cls.__module__,
-                'classname': cls.__class__.__name__
+                'classname': cls.__name__
             }
             del pch['cls']
             coll.save(pch)

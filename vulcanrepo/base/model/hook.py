@@ -42,7 +42,7 @@ class PostCommitHook(MappedClass):
         return cls(
             hook_cls={
                 "module": obj.__module__,
-                "classname": obj.__class__.__name__
+                "classname": obj.__name__
             },
             **kwargs)
 
