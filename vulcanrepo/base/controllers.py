@@ -688,7 +688,11 @@ class RepoWebServiceAuthController(WebServiceAuthController):
 
     @expose()
     def authenticate_user(self, username, password):
-        g.auth_provider.login()
+        try:
+            g.auth_provider.login()
+        except exc.HTTPUnauthorized:
+            request.environ['pylons.status_code_redirect'] = False
+            raise exc.HTTPForbidden()
         return ''
 
     @expose('json')
