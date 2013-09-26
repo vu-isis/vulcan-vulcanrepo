@@ -38,6 +38,16 @@ class PostCommitHook(MappedClass):
     acl = FieldProperty(ACL(permissions=['install', 'read']))
 
     @classmethod
+    def upsert(cls, obj, **kwargs):
+        isnew = False
+        pch = cls.query.get(
+            module=obj.__module__, classname=obj.__name__, **kwargs)
+        if not pch:
+            pch = cls.from_object(obj, **kwargs)
+            isnew = True
+        return pch, isnew
+
+    @classmethod
     def from_object(cls, obj, **kwargs):
         return cls(
             hook_cls={

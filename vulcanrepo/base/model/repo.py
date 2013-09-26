@@ -469,12 +469,17 @@ class Repository(Artifact):
         """
         raise NotImplementedError('clone_command')
 
-    def upsert_post_commit_hook(self, pch, **kw):
+    def upsert_post_commit_hook(self, pch, args=None, kwargs=None):
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
         for p in self.post_commit_hooks:
             if p.plugin_id == pch._id:
-                p.update(kw)
+                p.update({"args": args, "kwargs": kwargs})
                 return False
-        self.post_commit_hooks.append(dict(plugin_id=pch._id, **kw))
+        self.post_commit_hooks.append(dict(
+            plugin_id=pch._id, args=args, kwargs=kwargs))
         return True
 
     def remove_post_commit_hook(self, plugin_id):
