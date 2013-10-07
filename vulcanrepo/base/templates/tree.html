@@ -175,12 +175,12 @@
                 ]
             });
 
+            filebrowser = $fileBrowser.data("vf-fileBrowser");
+
             if (fbData){
                 loadCommitInfo(fbData, initPath);
                 renderReadMe(initPath);
             }
-
-            filebrowser = $fileBrowser.data("fileBrowser");
         });
     </script>
 {{ super() }}

@@ -200,8 +200,8 @@ class SVNRepository(Repository):
     type_s = 'SVN Repository'
     MAX_MEM_READ = 50 * 10 ** 6
     url_map = {
-        'ro': 'http://svn.{host}{path}',
-        'rw': 'svn+ssh://{username}@{host}{path}',
+        'ro': 'http://svn.{domain}{path}',
+        'rw': 'svn+ssh://{username}@{domain}{path}',
         'https': 'https://{username}@{host}{path}',
         'https_anon': 'https://{host}{path}'
     }
@@ -306,7 +306,7 @@ class SVNRepository(Repository):
             return oids
         cursor = SVNCommit.query.find({'repository_id': self._id})
         seen_oids = set(ci.object_id for ci in cursor)
-        return list(set(oids).difference(seen_oids))
+        return sorted(list(set(oids).difference(seen_oids)))
 
     def refresh_commit(self, ci):
         rev = ci.svn_revision

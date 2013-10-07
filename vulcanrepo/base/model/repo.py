@@ -1,6 +1,7 @@
 """
 Basic model for repositories
 """
+import cgi
 import os
 import errno
 import logging
@@ -15,7 +16,7 @@ from pylons import tmpl_context as c, app_globals as g
 import pymongo.errors
 from ming import schema as S
 from ming.utils import LazyProperty
-from ming.odm import FieldProperty, RelationProperty, session
+from ming.odm import FieldProperty, RelationProperty, session, state
 from ming.odm.property import ORMProperty, ManyToOneJoin
 from ming.odm.declarative import MappedClass
 
@@ -80,10 +81,15 @@ class RepositoryContent(ArtifactApiMixin):
     def repo(self):
         return self.commit.repo
 
-    def ls_entry(self):
+    def ls_entry(self, escape=False):
+        name = h.really_unicode(self.name)
+        path = self.path
+        if escape:
+            name = cgi.escape(name)
+            path = cgi.escape(path)
         return {
-            "name": h.really_unicode(self.name),
-            "path": self.path,
+            "name": name,
+            "path": path,
             "href": self.url(),
             "type": "FILE" if self.kind == "File" else "DIR",
             "artifact": {
@@ -150,8 +156,8 @@ class RepositoryFile(RepositoryContent):
     def open(self):
         raise NotImplementedError('open')
 
-    def ls_entry(self):
-        entry = super(RepositoryFile, self).ls_entry()
+    def ls_entry(self, escape=False):
+        entry = super(RepositoryFile, self).ls_entry(escape=escape)
         entry.update({
             "downloadURL": self.raw_url(),
             'size': self.size
@@ -172,7 +178,7 @@ class RepositoryFile(RepositoryContent):
     def get_alt_resource(self, key, **kw):
         if self.alt_object:
             r = self.alt_object.get_alt_url(key)
-            if isinstance(r, dict):
+            if isinstance(r, dict) and 'key' in r:
                 r = '{}_s3_proxy/resource/{}'.format(self.repo.url(), r['key'])
             return r
 
@@ -181,6 +187,7 @@ class RepositoryFile(RepositoryContent):
             url = ArtifactApiMixin._process_alt_file(self, file, **kw)
         self.alt_object = RepoAlternate.upsert(self)
         self.alt_object.resources[key] = url
+        self.alt_object.loading = False
         if not self.alt_object.content_hash:
             self.alt_object.content_hash = self.get_content_hash()
         if flush:
@@ -263,9 +270,9 @@ class RepositoryFolder(RepositoryContent):
             if obj.kind == 'File':
                 yield obj
 
-    def ls(self, include_self=False):
+    def ls(self, include_self=False, escape=False):
         objs = chain([self], iter(self)) if include_self else iter(self)
-        return [obj.ls_entry() for obj in objs]
+        return [obj.ls_entry(escape=escape) for obj in objs]
 
     def get_from_path(self, path):
         full_path = os.path.normpath(os.path.join(self.path, path))
@@ -457,6 +464,8 @@ class Repository(Artifact):
         port_str = ':{}'.format(port) if port != port_defaults[scheme] else ''
         return self.url_map[category].format(
             host=domain + port_str,
+            domain=domain,
+            port=port,
             path=self.url_path + self.url_name,
             username=username
         )
@@ -470,12 +479,17 @@ class Repository(Artifact):
         """
         raise NotImplementedError('clone_command')
 
-    def upsert_post_commit_hook(self, pch, **kw):
+    def upsert_post_commit_hook(self, pch, args=None, kwargs=None):
+        if args is None:
+            args = []
+        if kwargs is None:
+            kwargs = {}
         for p in self.post_commit_hooks:
             if p.plugin_id == pch._id:
-                p.update(kw)
+                p.update({"args": args, "kwargs": kwargs})
                 return False
-        self.post_commit_hooks.append(dict(plugin_id=pch._id, **kw))
+        self.post_commit_hooks.append(dict(
+            plugin_id=pch._id, args=args, kwargs=kwargs))
         return True
 
     def remove_post_commit_hook(self, plugin_id):
@@ -586,7 +600,7 @@ class Repository(Artifact):
 
         commit_msgs = []
         ref_ids = []
-        new_commit_ids = set()
+        new_commit_ids = []
         lc = None
 
         # Add commit objects to the db
@@ -612,7 +626,7 @@ class Repository(Artifact):
                 self.post_commit_feed(ci)
                 commit_msgs.append(ci.notification_message)
 
-            new_commit_ids.add(oid)
+            new_commit_ids.append(oid)
 
         if notify and commit_msgs:
             self.notify_commits(commit_msgs, last_commit=lc)
@@ -633,10 +647,11 @@ class Repository(Artifact):
             if all_commits:
                 self.run_batched_post_commit_hooks()
             else:
-                new_commits = self.commit_cls.query.find({
-                    'repository_id': self._id,
-                    'object_id': {'$in': list(new_commit_ids)}
-                }).all()
+                # do individual queries to maintain order
+                new_commits = [
+                    self.commit_cls.query.get(
+                        repository_id=self._id, object_id=oid)
+                    for oid in new_commit_ids]
                 self.run_post_commit_hooks(new_commits)
 
         return len(commit_ids)
@@ -939,6 +954,12 @@ class RepoContentRelation(RelationProperty):
             raise RepoNoJoin('Cannot find repo spec property for {}'.format(
                 self.mapper.mapped_class))
         return prop
+
+    def __set__(self, instance, value):
+        super(RepoContentRelation, self).__set__(instance, value)
+        if self.fetch:
+            st = state(instance)
+            st.extra_state[self] = value
 
     @LazyProperty
     def join(self):

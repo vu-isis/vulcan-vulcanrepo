@@ -219,7 +219,7 @@ class RepositoryApp(Application):
 
     def _get_default_post_commits(self):
         pchs = []
-        for shortname in self.default_hooks["post_commit"]:
+        for shortname in self.default_hooks.get("post_commit", []):
             plugin = PostCommitHook.query.get(shortname=shortname)
             if plugin:
                 pchs.append(dict(plugin_id=plugin._id))

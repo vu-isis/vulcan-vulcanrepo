@@ -4,6 +4,7 @@ import logging
 import tempfile
 import urllib
 import cgi
+from markupsafe import Markup
 
 from ming.odm import session
 from vulcanforge.auth.model import User
@@ -31,6 +32,7 @@ from vulcanforge.artifact.controllers import (
 from vulcanforge.artifact.model import Feed, ArtifactReference
 from vulcanforge.artifact.widgets import RelatedArtifactsWidget
 from vulcanforge.cache.decorators import cache_rendered
+from vulcanforge.config.render.jsonify import JSONSafe
 from vulcanforge.discussion.controllers import AppDiscussionController
 import vulcanforge.discussion.widgets
 from vulcanforge.neighborhood.model import Neighborhood
@@ -121,7 +123,7 @@ class RepoStatsController(BaseController):
     @cache_rendered(timeout=STATS_CACHE_TIMEOUT)
     @validate(CommitQuerySchema())
     def commit_aggregate(self, date_start=None, date_end=None, bins=None,
-                         order=None, label=None, user=None, **extra_query):
+                         order=None, label=None, user=None):
         if bins is None:
             bins = ['daily']
         agg = CommitAggregator(
@@ -131,8 +133,7 @@ class RepoStatsController(BaseController):
             repo=c.app.repo,
             order=order,
             label=label,
-            user=user,
-            extra_query=extra_query
+            user=user
         )
         agg.run()
         return agg.fix_results()
@@ -169,7 +170,7 @@ class BaseRepositoryController(BaseController):
             return '%r refresh queued.\n' % c.app.repo
 
     @expose(TEMPLATE_DIR + 'tree.html')
-    @expose('json')
+    @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
         if c.folder.kind == 'File':
@@ -182,7 +183,11 @@ class BaseRepositoryController(BaseController):
         else:
             data = {}
 
-        if not data:
+        if data:
+            for path, entry in data.iteritems():
+                if 'commit' in entry.get('extra', {}):
+                    entry['extra']['commit'] = Markup(entry['extra']['commit'])
+        else:
             for entry in c.folder.ls(include_self=True):
                 entry.setdefault('extra', {})
                 entry['extra']['forkUrl'] = '{}_modify/fork_artifact'.format(
@@ -208,9 +213,9 @@ class BaseRepositoryController(BaseController):
             if g.cache:
                 g.cache.hset_json(c.folder.cache_name, 'tree_json', data)
 
-        return dict(rev=rev, data=data)
+        return dict(rev=rev, data=JSONSafe(data))
 
-    @expose('json')
+    @expose('json', render_params={"sanitize": False})
     def dir_last_commits(self, rev, *args, **kwargs):
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
         data = {}
@@ -229,7 +234,9 @@ class BaseRepositoryController(BaseController):
                         paths.append(path[path_i:])
                     else:
                         data[path] = {
-                            'extra': {'commit': info['extra']['commit']}
+                            'extra': {
+                                'commit': Markup(info['extra']['commit'])
+                            }
                         }
                 if not paths:  # we have all the info we need
                     return {'data': data}
@@ -244,10 +251,14 @@ class BaseRepositoryController(BaseController):
                     last_commit)
                 commit_text = (
                     u'{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
-                        author_content, **last_commit)
+                        author_content,
+                        summary=cgi.escape(last_commit['summary']),
+                        shortlink=last_commit['shortlink'],
+                        href=last_commit['href']
+                )
 
             data[path] = {
-                'extra': {'commit': commit_text}
+                'extra': {'commit': Markup(commit_text)}
             }
             if cache_result:
                 tree_data[path].setdefault('extra', {})
@@ -258,6 +269,22 @@ class BaseRepositoryController(BaseController):
             g.cache.hset_json(c.folder.cache_name, 'tree_json', tree_data)
 
         return {'data': data}
+
+    @expose('json')
+    def last_commit(self, rev, *args, **kwargs):
+        """
+        returns {
+            "date": commit.authored.date,
+            "author_name": commit.authored.name,
+            "author_email": commit.authored.email,
+            "id": commit.object_id,
+            "href": commit.url(),
+            "shortlink": commit.shorthand_id(),
+            "summary": commit.summary
+        }
+        """
+        c.commit, c.obj, rev = get_commit_and_obj(rev, *args)
+        return c.obj.get_last_commit().info()
 
     @expose(TEMPLATE_DIR + 'readme.html')
     def readme(self, rev, *args, **kwargs):
@@ -661,7 +688,11 @@ class RepoWebServiceAuthController(WebServiceAuthController):
 
     @expose()
     def authenticate_user(self, username, password):
-        g.auth_provider.login()
+        try:
+            g.auth_provider.login()
+        except exc.HTTPUnauthorized:
+            request.environ['pylons.status_code_redirect'] = False
+            raise exc.HTTPForbidden()
         return ''
 
     @expose('json')

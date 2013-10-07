@@ -28,6 +28,7 @@ class CommitAggregator(BaseStatsAggregator):
 
     def make_query(self):
         super(CommitAggregator, self).make_query()
+        self.query['authored.date'] = {'$ne': None}
         if self.repo:
             self.query['app_config_id'] = self.repo.app_config_id
         # user should be a dictionary (name, email) or list of such dicts
