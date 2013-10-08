@@ -1,7 +1,10 @@
+from contextlib import contextmanager
 import logging
-import bson
 import os
 import json
+import re
+import zipfile
+import requests
 
 from ming import schema as S
 from ming.odm import FieldProperty, ThreadLocalODMSession, session
@@ -10,7 +13,7 @@ from pylons import tmpl_context as c
 from vulcanforge.auth.schema import ACL
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
-from vulcanforge.common.util.filesystem import import_object
+from vulcanforge.common.util.filesystem import import_object, temporary_dir
 from vulcanforge.visualize.model import Visualizer
 
 from vulcanrepo.tasks import purge_hook
@@ -137,11 +140,38 @@ class MultiCommitPlugin(Plugin):
         pass
 
 
+class FinalCommitPlugin(MultiCommitPlugin):
+    """pass most recent valid commit only to run"""
+    def __init__(self, restrict_branch_to='master'):
+        self.restrict_branch_to = restrict_branch_to
+        super(MultiCommitPlugin, self).__init__()
+
+    def is_valid_branch(self, commit):
+        valid = True
+        if commit.repo.type_s == 'Git Repository' and self.restrict_branch_to:
+            valid = self.restrict_branch_to in commit.branches()
+        return valid
+
+    def on_submit(self, commits):
+        #if not self.visualizer.bundle_content:
+        for commit in commits[::-1]:
+            if self.is_valid_branch(commit):
+                self.run(commit)
+                break
+        else:
+            # no commit found on valid branch
+            return
+
+    def run(self, commit):
+        """Subclasses override this"""
+        pass
+
+
 class PostCommitError(Exception):
     pass
 
 
-class VisualizerManager(MultiCommitPlugin):
+class VisualizerManager(FinalCommitPlugin):
     """This is a bit inefficient, but is the easiest way to sync"""
 
     def __init__(self, visualizer_shortname, restrict_branch_to='master',
@@ -150,16 +180,10 @@ class VisualizerManager(MultiCommitPlugin):
             shortname=visualizer_shortname)
         if not self.visualizer:
             self.visualizer = Visualizer(shortname=visualizer_shortname)
-        self.restrict_branch_to = restrict_branch_to
-        super(VisualizerManager, self).__init__()
+        super(VisualizerManager, self).__init__(
+            restrict_branch_to=restrict_branch_to)
 
-    def is_valid_branch(self, commit):
-        valid = True
-        if commit.repo.type_s == 'Git Repository' and self.restrict_branch_to:
-            valid = self.restrict_branch_to in commit.branches()
-        return valid
-
-    def init_from_commit(self, commit):
+    def run(self, commit):
         bundle_content = []
         self.visualizer.delete_s3_keys()
 
@@ -193,12 +217,80 @@ class VisualizerManager(MultiCommitPlugin):
         session(Visualizer).flush(self.visualizer)
         LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
 
-    def on_submit(self, commits):
-        #if not self.visualizer.bundle_content:
-        for commit in commits[::-1]:
-            if self.is_valid_branch(commit):
-                self.init_from_commit(commit)
-                break
+
+class ContentPoster(CommitPlugin):
+    """Posts new/changed content at paths to specified urls"""
+
+    def __init__(self, urls, paths, method="POST", params=None,
+                 restrict_branch_to='master'):
+        super(ContentPoster, self).__init__()
+        self.urls = urls
+        self.path_res = [re.compile(r'^' + p) for p in paths]
+        self.method = method
+        self.params = params
+        self.restrict_branch_to = restrict_branch_to
+
+    def is_valid_branch(self, commit):
+        valid = True
+        if commit.repo.type_s == 'Git Repository' and self.restrict_branch_to:
+            valid = self.restrict_branch_to in commit.branches()
+        return valid
+
+    def _write_content(self, obj, dirname):
+        # make filename
+        fname = obj.name
+        if obj.kind == 'Folder':
+            fname += '.zip'
+        cur = obj
+        while os.path.exists(os.path.join(dirname, fname)):
+            cur = parent = cur.parent
+            fname = parent.name + '_' + fname
+
+        if obj.kind == 'File':
+            fp = open(fname, 'w+')
+            fp.write(obj.read())
+            fp.seek(0)
         else:
-            # no commit found on valid branch
+            with zipfile.ZipFile(fname, 'w') as zp:
+                for f in obj.find_files():
+                    arcname = os.path.relpath(obj.path, f.path)
+                    zp.writestr(f.read(), arcname)
+            fp = open(fname, 'r')
+        return fname, fp
+
+    def _iter_matching(self, commit):
+        for modded_path in self.get_modded_paths(commit):
+            for pattern in self.path_res:
+                match = pattern.match(modded_path)
+                if match:
+                    try:
+                        path = match.group('content_path')
+                    except IndexError:
+                        path = modded_path
+                    obj = commit.get_path(path)
+                    yield obj
+
+    @contextmanager
+    def _open_files(self, commit):
+        fps = []
+        seen = set()
+        with temporary_dir() as dirname:
+            try:
+                for obj in self._iter_matching(commit):
+                    if obj.index_id() not in seen:
+                        fp = self._write_content(obj, dirname)
+                        fps.append(fp)
+                        seen.add(obj.index_id())
+                yield fps
+            finally:
+                for fp in fps:
+                    fp[1].close()
+
+    def on_submit(self, commit):
+        if not self.is_valid_branch(commit):
             return
+        with self._open_files(commit) as files:
+            if files:
+                submit_func = getattr(requests, self.method.lower())
+                for url in self.urls:
+                    submit_func(url, files=files, data=self.params)

@@ -128,7 +128,7 @@ class RepositoryContent(ArtifactApiMixin):
         return u'.'.join((
             str(self.app_config_id),
             self.version_id,  # mixins should apply this (do not add here)
-            self.path
+            self.path.encode('utf8')
         ))
 
 

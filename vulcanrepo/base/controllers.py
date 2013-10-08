@@ -254,8 +254,7 @@ class BaseRepositoryController(BaseController):
                         author_content,
                         summary=cgi.escape(last_commit['summary']),
                         shortlink=last_commit['shortlink'],
-                        href=last_commit['href']
-                )
+                        href=last_commit['href'])
 
             data[path] = {
                 'extra': {'commit': Markup(commit_text)}
