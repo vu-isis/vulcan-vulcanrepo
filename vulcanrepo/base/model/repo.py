@@ -35,6 +35,7 @@ from vulcanforge.auth.model import User
 from vulcanforge.discussion.model import Thread
 from vulcanforge.project.model import AppConfig, Project
 from vulcanforge.notification.model import Notification
+from vulcanforge.visualize.base import VisualizableMixIn
 
 from vulcanrepo.exceptions import RepoNoJoin
 from .hook import PostCommitHook
@@ -123,7 +124,7 @@ class RepositoryContent(ArtifactApiMixin):
         ))
 
 
-class RepositoryFile(RepositoryContent):
+class RepositoryFile(RepositoryContent, VisualizableMixIn):
     """Facade for interacting with a repository file"""
     kind = 'File'
     type_s = 'Blob'
@@ -147,6 +148,9 @@ class RepositoryFile(RepositoryContent):
     def open(self):
         raise NotImplementedError('open')
 
+    def read(self):
+        raise NotImplementedError('read')
+
     def ls_entry(self, escape=False):
         entry = super(RepositoryFile, self).ls_entry(escape=escape)
         entry.update({
@@ -161,45 +165,6 @@ class RepositoryFile(RepositoryContent):
         if not parent_path.endswith('/'):
             parent_path += '/'
         return self.folder_cls(self.commit, parent_path)
-
-    @LazyProperty
-    def alt_object(self):
-        return RepoAlternate.get_by_file(self)
-
-    def get_alt_resource(self, key, **kw):
-        if self.alt_object:
-            r = self.alt_object.get_alt_url(key)
-            if isinstance(r, dict) and 'key' in r:
-                r = '{}_s3_proxy/resource/{}'.format(self.repo.url(), r['key'])
-            return r
-
-    def set_alt_resource(self, key, url=None, file=None, flush=False, **kw):
-        if file and not url:
-            url = ArtifactApiMixin._process_alt_file(self, file, **kw)
-        self.alt_object = RepoAlternate.upsert(self)
-        self.alt_object.resources[key] = url
-        self.alt_object.loading = False
-        if not self.alt_object.content_hash:
-            self.alt_object.content_hash = self.get_content_hash()
-        if flush:
-            session(RepoAlternate).flush(self.alt_object)
-
-    def _get_alt_loading(self):
-        if self.alt_object:
-            return self.alt_object.loading
-        return False
-
-    def _set_alt_loading(self, loading):
-        self.alt_object = RepoAlternate.upsert(self)
-        self.alt_object.loading = loading
-
-    alt_loading = property(_get_alt_loading, _set_alt_loading)
-
-    def url_for_visualizer(self):
-        return self.get_alt_resource('visualizer') or self.raw_url()
-
-    def alternate_rest_url(self):
-        return '/rest' + self.url_for_method('alternate')
 
     def get_content_hash(self):
         raise NotImplementedError('get_content_hash')
@@ -221,6 +186,12 @@ class RepositoryFile(RepositoryContent):
             fp.write(src.read())
             src.close()
         return self.name
+
+    def unique_id(self):
+        return self.index_id()
+
+    def artifact_ref_id(self):
+        return self.index_id()
 
 
 class RepositoryFolder(RepositoryContent):

@@ -4,7 +4,6 @@
 {% do g.resource_manager.register_css('visualize/vf_visualizer_embedder.scss') %}
 
 {% do g.resource_manager.register_js('visualize/visualizer.js') %}
-{% do g.resource_manager.register_js('visualize/VFVisualizerEmbedder.js') %}
 
 {% block title %}
   {{c.project.name}} / {{c.app.config.options.mount_label}} /
@@ -43,6 +42,6 @@
           </div>
       {% endif %}
   {% endblock %}
-  {{c.visualizer_widget.display(value=c.file, context="repo", force=force_display, extra_params=extra_params)}}
+  {{g.visualize.full_render_artifact(value=c.file, context="repo", force=force_display, extra_params=extra_params)}}
   {{c.thread.display(value=thread, title="Discussion", new_post_text="New Comment")}}
 {% endblock %}

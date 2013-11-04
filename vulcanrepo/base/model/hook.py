@@ -11,7 +11,7 @@ from vulcanforge.auth.schema import ACL
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
 from vulcanforge.common.util.filesystem import import_object
-from vulcanforge.visualize.model import Visualizer
+from vulcanforge.visualize.model import VisualizerConfig
 
 from vulcanrepo.tasks import purge_hook
 
@@ -146,10 +146,10 @@ class VisualizerManager(MultiCommitPlugin):
 
     def __init__(self, visualizer_shortname, restrict_branch_to='master',
                  **kw):
-        self.visualizer = Visualizer.query.get(
+        self.visualizer = VisualizerConfig.query.get(
             shortname=visualizer_shortname)
         if not self.visualizer:
-            self.visualizer = Visualizer(shortname=visualizer_shortname)
+            self.visualizer = VisualizerConfig(shortname=visualizer_shortname)
         self.restrict_branch_to = restrict_branch_to
         super(VisualizerManager, self).__init__()
 
@@ -190,7 +190,7 @@ class VisualizerManager(MultiCommitPlugin):
 
         self.visualizer.bundle_content = bundle_content
         LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
-        session(Visualizer).flush(self.visualizer)
+        session(VisualizerConfig).flush(self.visualizer)
         LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
 
     def on_submit(self, commits):

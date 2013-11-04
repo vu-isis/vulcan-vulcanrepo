@@ -7,9 +7,6 @@ import cgi
 from markupsafe import Markup
 
 from ming.odm import session
-from vulcanforge.auth.model import User
-from vulcanforge.common.controllers.rest import WebServiceAuthController
-from vulcanforge.common.validators import DateTimeConverter
 from webob import exc
 from formencode import validators
 from paste.deploy.converters import asbool
@@ -17,6 +14,9 @@ from pylons import tmpl_context as c, app_globals as g, request, response
 from tg import redirect, expose, flash, validate
 from tg.decorators import with_trailing_slash, without_trailing_slash
 from boto.exception import S3ResponseError
+from vulcanforge.common.controllers.rest import WebServiceAuthController
+from vulcanforge.common.util.controller import get_remainder_path
+from vulcanforge.common.validators import DateTimeConverter
 from vulcanforge.common.controllers import BaseController
 from vulcanforge.common.controllers.decorators import require_post
 from vulcanforge.common import helpers as h
@@ -31,6 +31,7 @@ from vulcanforge.artifact.controllers import (
 )
 from vulcanforge.artifact.model import Feed, ArtifactReference
 from vulcanforge.artifact.widgets import RelatedArtifactsWidget
+from vulcanforge.auth.model import User
 from vulcanforge.cache.decorators import cache_rendered
 from vulcanforge.config.render.jsonify import JSONSafe
 from vulcanforge.discussion.controllers import AppDiscussionController
@@ -39,11 +40,6 @@ from vulcanforge.neighborhood.model import Neighborhood
 from vulcanforge.project.exceptions import NoSuchProjectError
 from vulcanforge.project.model import Project
 from vulcanforge.stats import STATS_CACHE_TIMEOUT
-from vulcanforge.visualize.model import Visualizer
-from vulcanforge.visualize.widgets.visualize import (
-    DiffVisualizer,
-    ArtifactEmbedVisualizer
-)
 
 from vulcanrepo import tasks as repo_tasks
 from vulcanrepo.stats import CommitAggregator, CommitQuerySchema
@@ -69,19 +65,10 @@ def get_commit(rev, args, depth=10):
     return commit, rev, args
 
 
-def get_path(args, use_ext=False):
-    path = '/' + '/'.join(args)
-    if use_ext:
-        request_ext = request.response_ext
-        if request_ext and not path.endswith(request_ext):
-            path += request.response_ext
-    return path
-
-
 def get_commit_and_obj(rev, *args, **kw):
     """Get commit and file/folder object from rev and args"""
     commit, rev, args = get_commit(rev, args)
-    path = get_path(args, kw.get('use_ext', False))
+    path = get_remainder_path(args, kw.get('use_ext', False))
     obj = commit.get_path(path)
     if not obj:
         raise exc.HTTPNotFound()
@@ -94,7 +81,7 @@ class S3ProxyController(BaseController):
     @expose()
     def resource(self, *args, **kw):
         g.security.require_access(c.app, 'read')
-        key_name = get_path(map(h.urlquote, args), use_ext=True)
+        key_name = get_remainder_path(map(h.urlquote, args))
         LOG.info('getting repo s3 key at %s', key_name)
         try:
             key = g.s3_bucket.get_key(key_name)
@@ -140,14 +127,11 @@ class RepoStatsController(BaseController):
 
 
 class BaseRepositoryController(BaseController):
-    _s3_proxy = S3ProxyController()
     stats = RepoStatsController()
 
     class Widgets(BaseController.Widgets):
         commit_browser_widget = SCMCommitBrowserWidget()
         commit_author_widget = CommitAuthorWidget()
-        diff_widget = DiffVisualizer()
-        visualizer_widget = ArtifactEmbedVisualizer()
         log_widget = SCMLogWidget()
         thread_widget = vulcanforge.discussion.widgets.ThreadWidget(
             page=None, limit=None, page_size=None, count=None, style='linear')
@@ -202,10 +186,9 @@ class BaseRepositoryController(BaseController):
                 if entry["type"] == "FILE":
                     entry['extra']['size'] = h.pretty_print_file_size(
                         entry["size"])
-                    visualizers = Visualizer.get_for_resource(
-                        entry["path"], cache=True)
-                    if len(visualizers) > 0:
-                        entry['extra']['iconURL'] = visualizers[0].icon_url
+                    icon_url = g.visualize.get_icon_url(entry['path'])
+                    if icon_url:
+                        entry['extra']['iconURL'] = icon_url
 
                 data[entry["path"]] = entry
 
@@ -317,7 +300,6 @@ class BaseRepositoryController(BaseController):
             return iter(c.file.open())
         else:
             c.related_artifacts_widget = self.Widgets.related_artifacts_widget
-            c.visualizer_widget = self.Widgets.visualizer_widget
             c.thread = self.Widgets.thread_widget
             extra_params = kw.get('extra_params')
             if extra_params:
@@ -355,7 +337,7 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'log.html')
     def history(self, rev, *args, **kw):
         c.commit, rev, _ = get_commit(rev, args)
-        path = get_path(args, use_ext=True)
+        path = get_remainder_path(args)
         if path == '/':
             path = None
 

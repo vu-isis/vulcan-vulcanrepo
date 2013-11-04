@@ -14,7 +14,7 @@ from vulcanforge.common.app import DefaultAdminController, Application
 from vulcanforge.common.controllers.decorators import require_post
 from vulcanforge.common.types import SitemapEntry, ConfigOption
 from vulcanforge.common.util import push_config
-from vulcanforge.common.util.decorators import exceptionless
+from vulcanforge.common.util.exception import exceptionless
 from vulcanforge.resources import Icon
 
 from vulcanrepo.base.model.hook import PostCommitHook
