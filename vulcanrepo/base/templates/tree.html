@@ -143,7 +143,7 @@
                 },
 
                 getDataForPath: function (path, callback) {
-                    var dataURL = repoURL + 'folder/' + oid + path.slice(0, -1) + '.json',
+                    var dataURL = repoURL + 'folder/' + oid + path.slice(0, -1),
                         actionList;
                     $.ajax({
                         url: dataURL,

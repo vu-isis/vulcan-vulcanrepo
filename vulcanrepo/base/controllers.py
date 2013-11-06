@@ -172,10 +172,10 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
-        c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
+        c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
-            redirect(
-                c.commit.url_for_method('file') + '/' + '/'.join(args), **kw)
+            redirect(c.commit.url_for_method('file') + '/' +
+                     get_path(args, use_ext=True), **kw)
 
         # get cache, if available
         if g.cache:
