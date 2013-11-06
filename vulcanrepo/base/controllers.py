@@ -71,9 +71,8 @@ def get_commit(rev, args, depth=10):
 
 def get_path(args, use_ext=False):
     path = '/' + '/'.join(args)
-    if use_ext:
-        request_ext = request.response_ext
-        if request_ext and not path.endswith(request_ext):
+    if use_ext and request.response_ext:
+        if not os.path.basename(request.path) == os.path.basename(path):
             path += request.response_ext
     return path
 
@@ -172,6 +171,12 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
+        """
+        TODO: Folders ending in `.json` will return the JSON structure instead
+        of the HTML page when the html page is requested.
+        A rare case but a bug nonetheless.
+        see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
+        """
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
             redirect(c.commit.url_for_method('file') + '/' +
