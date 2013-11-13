@@ -156,10 +156,16 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
-        c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
+        """
+        TODO: Folders ending in `.json` will return the JSON structure instead
+        of the HTML page when the html page is requested.
+        A rare case but a bug nonetheless.
+        see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
+        """
+        c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
-            redirect(
-                c.commit.url_for_method('file') + '/' + '/'.join(args), **kw)
+            redirect(c.commit.url_for_method('file') + '/' +
+                     get_path(args, use_ext=True), **kw)
 
         # get cache, if available
         if g.cache:
