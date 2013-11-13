@@ -132,13 +132,16 @@ class GitCommit(Commit):
             return None
         return obj
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
         if path == '/':
             return self.tree
 
-        obj = self.get_obj_from_path(path)
-        if obj:
-            return make_content_object(obj, self)
+        if verify:
+            obj = self.get_obj_from_path(path)
+            if obj:
+                return make_content_object(obj, self)
+        else:
+            return GitFile(self, path)
 
     @property
     def files_removed(self):

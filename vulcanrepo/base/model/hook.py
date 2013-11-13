@@ -1,5 +1,4 @@
 import logging
-import bson
 import os
 import json
 
@@ -7,7 +6,7 @@ from ming import schema as S
 from ming.odm import FieldProperty, ThreadLocalODMSession, session
 from ming.odm.declarative import MappedClass
 from pylons import tmpl_context as c
-from vulcanforge.auth.schema import ACL
+from vulcanforge.auth.schema import ACL, ACE, EVERYONE
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
 from vulcanforge.common.util.filesystem import import_object
@@ -48,13 +47,23 @@ class PostCommitHook(MappedClass):
         return pch, isnew
 
     @classmethod
-    def from_object(cls, obj, **kwargs):
-        return cls(
+    def from_object(cls, obj, acl=None, description=None, **kwargs):
+        if description is None:
+            description = getattr(obj, "description", '')
+        if acl is None:
+            acl = getattr(obj, "acl", [
+                ACE.allow(EVERYONE, 'read'),
+                ACE.allow(EVERYONE, 'install')
+            ])
+        inst = cls(
             hook_cls={
                 "module": obj.__module__,
                 "classname": obj.__name__
             },
+            description=description,
+            acl=acl,
             **kwargs)
+        inst.acl = getattr(obj, "description", '')
 
     def delete(self):
         purge_hook.post(self._id)
@@ -141,11 +150,17 @@ class PostCommitError(Exception):
     pass
 
 
-class VisualizerManager(MultiCommitPlugin):
-    """This is a bit inefficient, but is the easiest way to sync"""
+class VisualizerHook(CommitPlugin):
+    """Calls on_upload hook for visualizers"""
+    def on_submit(self, commit):
+        for obj in commit.files_added + commit.files_modified:
+            obj.trigger_vis_upload_hook()
 
-    def __init__(self, visualizer_shortname, restrict_branch_to='master',
-                 **kw):
+
+class VisualizerManager(MultiCommitPlugin):
+    """Syncs repo content with a S3HostedVisualizer"""
+
+    def __init__(self, visualizer_shortname, restrict_branch_to='master'):
         self.visualizer = VisualizerConfig.query.get(
             shortname=visualizer_shortname)
         if not self.visualizer:

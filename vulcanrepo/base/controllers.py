@@ -322,7 +322,6 @@ class BaseRepositoryController(BaseController):
         if not a:
             raise exc.HTTPNotFound()
 
-        c.diff_widget = self.Widgets.diff_widget
         return dict(a=a, b=c.file)
 
     @expose(TEMPLATE_DIR + 'commit.html')

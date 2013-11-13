@@ -687,7 +687,15 @@ class Commit(Artifact):
             r = cls.query.get(object_id=object_id, repository_id=repository_id)
         return r, isnew
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
+        """
+        Get the `RepositoryContent` instance at the given path.
+
+        :param verify: bool. if False, it will not verify that the file/folder
+        exists. Obviously, you should only do this if you're confident that it
+        does exist.
+
+        """
         raise NotImplementedError("get_path")
 
     def url(self):
@@ -737,7 +745,9 @@ class Commit(Artifact):
 
     @property
     def paths_added(self):
-        return set(self.diffs.added + map(itemgetter('new'), self.diffs.copied))
+        """Deprecated. This is only needed for backwards compat."""
+        return set(
+            self.diffs.added + map(itemgetter('new'), self.diffs.copied))
 
     @property
     def files_added(self):
@@ -746,7 +756,7 @@ class Commit(Artifact):
         for path in self.paths_added:
             if path not in added_paths:
                 added_paths.add(path)
-                obj = self.get_path(path)
+                obj = self.get_path(path, verify=False)
                 if obj.kind == 'File':
                     added.append(obj)
                 else:
@@ -758,7 +768,7 @@ class Commit(Artifact):
 
     @property
     def files_modified(self):
-        return [self.get_path(p) for p in self.diffs.changed]
+        return [self.get_path(p, verify=False) for p in self.diffs.changed]
 
     @LazyProperty
     def summary(self):

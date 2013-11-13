@@ -4,8 +4,6 @@ import logging
 from ming.odm import ThreadLocalODMSession
 from pylons import tmpl_context as c
 
-from vulcanforge.common.exceptions import ForgeError
-from vulcanforge.artifact.model import ArtifactProcessor
 from vulcanforge.common.util.model import chunked_find
 from vulcanforge.notification.model import Notification
 from vulcanforge.project.model import Project

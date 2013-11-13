@@ -1,5 +1,7 @@
 {% extends 'vulcanrepo.base:templates/repo_master.html' %}
 
+{% do g.resource_manager.register_css('visualize/vf_visualizer_embedder.scss') %}
+
 {% block title %}
 {{c.project.name}} / {{c.app.config.options.mount_label}} / Diff of {{h.really_unicode(a.path)}}
 {% endblock %}
@@ -16,11 +18,7 @@
 {% block content %}
 {{ clone_info(c.app.repo) }}
 <div class="grid-19" style="margin-bottom: 10px;">
-    {% if a %}
-    {{c.diff_widget.display(a=a, b=b)}}
-    {% else %}
-    File at past requested commit not found
-    {% endif %}
+    {{ g.visualize.full_diff_artifact(a, b) }}
 </div>
 {% endblock %}
 
