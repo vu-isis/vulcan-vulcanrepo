@@ -688,7 +688,7 @@ class RepoWebServiceAuthController(WebServiceAuthController):
         return {
             'allow_read': g.security.has_access(c.app, 'read', user=user),
             'allow_write': g.security.has_access(c.app, 'write', user=user),
-            'allow_create': g.security.has_access(c.app, 'create', user=user)
+            'allow_create': g.security.has_access(c.app, 'write', user=user)
         }
 
     @expose()

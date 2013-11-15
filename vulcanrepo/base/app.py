@@ -75,10 +75,12 @@ class Repo_IO(object):
 
 
 class RepositoryApp(Application):
-    permissions = [
-        'read', 'write', 'create', 'admin', 'configure',
-        'unmoderated_post', 'post', 'moderate'
-    ]
+    permissions = dict(Application.permissions,
+        write='',
+        moderate='Moderate comments',
+        unmoderated_post='Add comments without moderation',
+        post='Create new topics and add comments'
+    )
     config_options = Application.config_options + [
         ConfigOption('cloned_from_project_id', ObjectId, None),
         ConfigOption('cloned_from_repo_id', ObjectId, None),
@@ -156,7 +158,7 @@ class RepositoryApp(Application):
 #                className='nav_child'
 #            )
         ]
-        if self.permissions and g.security.has_access(self, 'configure'):
+        if self.permissions and g.security.has_access(self, 'admin'):
             links.append(
                 SitemapEntry(
                     'Permissions',
@@ -237,7 +239,7 @@ class RepoAdminController(DefaultAdminController):
         return self.app.repo
 
     def _check_security(self):
-        g.security.require_access(self.app, 'configure')
+        g.security.require_access(self.app, 'admin')
 
     @with_trailing_slash
     @expose()
@@ -270,7 +272,7 @@ class RepoAdminController(DefaultAdminController):
             app=self.app,
             hooks_json=dumps(hooks),
             admin_url=admin_url,
-            allow_config=g.security.has_access(self.app, 'configure')
+            allow_config=g.security.has_access(self.app, 'admin')
         )
 
     @expose('json')
