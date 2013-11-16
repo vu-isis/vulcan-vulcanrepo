@@ -418,6 +418,13 @@ class SVNRepository(Repository):
             self.svn.revpropset("svn:author", author, dest_url, revision=rev)
         self.refresh()
 
+    def add_folder(self, dest, msg='', author=None, make_parents=True):
+        dest_url = self.svn_url + dest
+        rev = self.svn.mkdir(dest_url, msg, make_parents)
+        if author:
+            self.svn.revpropset("svn:author", author, dest_url, revision=rev)
+        self.refresh()
+
 
 class SVNContentMixIn(object):
     # these are set by the mixee
@@ -458,6 +465,10 @@ class SVNContentMixIn(object):
             log = self.commit.log(1, 1, path=self.path, revision_end=rev_end)
             if log:
                 return log[0]
+
+    def get_timestamp(self):
+        """return POSIX timestamp of last modified time"""
+        return self._info.time
 
 
 class SVNFolder(RepositoryFolder, SVNContentMixIn):

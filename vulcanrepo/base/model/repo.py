@@ -108,10 +108,10 @@ class RepositoryContent(ArtifactApiMixin):
         return self.name if self.name else '/'
 
     def shorthand_id(self):
-        return '({}){}'.format(self.commit.shorthand_id(), self.path)
+        return u'({}){}'.format(self.commit.shorthand_id(), self.path)
 
     def index_id(self):
-        return 'Repo.{}.{}.{}'.format(
+        return u'Repo.{}.{}.{}'.format(
             self.app_config_id, self.commit.object_id, self.path)
 
     @property
@@ -797,7 +797,7 @@ class Commit(Artifact):
 
     @property
     def notification_message(self):
-        return '{} by {} <{}{}>'.format(
+        return u'{} by {} <{}{}>'.format(
             h.really_unicode(self.summary),
             h.really_unicode(self.committed.name),
             config.common_prefix,
