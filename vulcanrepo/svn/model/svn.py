@@ -212,7 +212,7 @@ class SVNRepository(Repository):
 
     @LazyProperty
     def svn_url(self):
-        return 'file://%s/%s' % (self.fs_path, self.name)
+        return u'file://%s/%s' % (self.fs_path, self.name)
 
     def init(self):
         fullname = self._setup_paths()
@@ -344,15 +344,15 @@ class SVNRepository(Repository):
             pysvn.opt_revision_kind.number,
             ci.commit_num - 1)
         for path in log_entry.changed_paths:
-            p = path.path
+            p = path.path.decode('utf8')
             rev = parent_rev if path.action == 'D' else ci.svn_revision
             is_file = self._is_file(p, rev)
             if not is_file:
-                p += '/'
+                p += u'/'
             if path.copyfrom_path:
                 from_p = path.copyfrom_path
                 if not is_file:
-                    from_p += '/'
+                    from_p += u'/'
                 ci.diffs.copied.append({
                     'old': h.really_unicode(from_p),
                     'new': h.really_unicode(p)
