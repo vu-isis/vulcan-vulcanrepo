@@ -1,6 +1,7 @@
 from tg import expose, redirect
 from tg.decorators import with_trailing_slash
-from pylons import tmpl_context as c
+from pylons import tmpl_context as c, app_globals as g
+from vulcanforge.common.controllers.decorators import require_post
 
 from vulcanrepo.base.controllers import (
     BaseRepositoryController,
@@ -27,4 +28,13 @@ class SVNRootController(BaseRepositoryController):
 
 
 class SVNRestController(RootRestController, SVNRootController):
-    pass
+
+    @require_post()
+    @expose()
+    def add_folder(self, folder_path, msg=None, **kwargs):
+        g.security.require_access(c.app, 'write')
+        if not folder_path.startswith('/'):
+            folder_path = '/' + folder_path
+        if msg is None:
+            msg = 'Added empty folder {}'.format(folder_path)
+        c.app.repo.add_folder(folder_path, msg=msg, author=c.user.username)

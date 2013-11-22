@@ -2,7 +2,7 @@ import os
 import shutil
 import logging
 import subprocess
-from datetime import datetime
+from datetime import datetime, time
 from collections import deque
 from itertools import chain, ifilter
 
@@ -488,6 +488,13 @@ class GitContentMixin(object):
         if oid:
             return GitCommit.query.get(
                 object_id=oid, repository_id=self.repo._id)
+
+    def get_timestamp(self):
+        """return POSIX timestamp of last modified time"""
+        ci = self.get_last_commit()
+        if ci:
+            dt = ci.committed["date"]
+            return time.mktime(dt.timetuple())
 
 
 class GitFolder(RepositoryFolder, GitContentMixin):

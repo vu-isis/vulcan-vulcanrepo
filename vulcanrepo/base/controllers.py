@@ -70,10 +70,10 @@ def get_commit(rev, args, depth=10):
 
 
 def get_path(args, use_ext=False):
-    path = '/' + '/'.join(args)
+    path = u'/' + u'/'.join([a.decode('utf8') for a in args])
     if use_ext and request.response_ext:
         if not os.path.basename(request.path) == os.path.basename(path):
-            path += request.response_ext
+            path += request.response_ext.decode('utf8')
     return path
 
 
@@ -171,12 +171,10 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
-        """
-        TODO: Folders ending in `.json` will return the JSON structure instead
-        of the HTML page when the html page is requested.
-        A rare case but a bug nonetheless.
-        see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
-        """
+        # TODO: Folders ending in `.json` will return the JSON structure
+        # instead of the HTML page when the html page is requested.
+        # A rare case but a bug nonetheless.
+        # see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
             redirect(c.commit.url_for_method('file') + '/' +
@@ -255,7 +253,7 @@ class BaseRepositoryController(BaseController):
                 author_content = self.Widgets.commit_author_widget.display(
                     last_commit)
                 commit_text = (
-                    '{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
+                    u'{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
                         author_content,
                         summary=cgi.escape(last_commit['summary']),
                         shortlink=last_commit['shortlink'],
