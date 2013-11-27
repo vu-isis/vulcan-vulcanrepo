@@ -73,6 +73,9 @@ class RepositoryContent(ArtifactApiMixin):
     def repo(self):
         return self.commit.repo
 
+    def url_for_rev(self, rev):
+        raise NotImplementedError('url_for_rev')
+
     def ls_entry(self, escape=False):
         name = h.really_unicode(self.name)
         path = self.path
@@ -131,6 +134,9 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
     link_type = 'file'
     folder_cls = None
 
+    def url_for_rev(self, rev):
+        return self.repo.url() + 'file/' + rev + self.path
+
     def url(self):
         return self.url_for_method('file')
 
@@ -162,8 +168,6 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
     @LazyProperty
     def parent(self):
         parent_path = os.path.dirname(self.path)
-        if not parent_path.endswith('/'):
-            parent_path += '/'
         return self.folder_cls(self.commit, parent_path)
 
     def get_content_hash(self):
@@ -204,6 +208,9 @@ class RepositoryFolder(RepositoryContent):
             path += '/'
         self.name = path.rsplit('/', 2)[-2]
         super(RepositoryFolder, self).__init__(commit, path)
+
+    def url_for_rev(self, rev):
+        return self.repo.url() + 'folder/' + rev + self.path
 
     def url(self):
         return self.url_for_method('folder')
@@ -253,6 +260,12 @@ class RepositoryFolder(RepositoryContent):
             if not obj.name in ignore:
                 obj.get_content_to_folder(path, ignore=ignore)
         return self.name
+
+    @LazyProperty
+    def parent(self):
+        if self.path != '/':
+            parent_path = os.path.normpath(os.path.join(self.path, os.pardir))
+            return self.__class__(self.commit, parent_path)
 
 
 class Repository(Artifact):
@@ -950,49 +963,3 @@ class _RepoContentJoin(ManyToOneJoin):
 
     def set(self, instance, value):
         self.prop.set_from_obj(instance, value)
-
-### END MING Relation Properties ###
-
-
-class RepoAlternate(MappedClass):
-
-    class __mongometa__:
-        name = 'repo_alternate'
-        session = repository_orm_session
-        unique_indexes = [(
-            'file_spec.path',
-            'file_spec.app_config_id',
-            'file_spec.version_id'
-        )]
-        indexes = ['content_hash']
-
-    _id = FieldProperty(S.ObjectId)
-    file_spec = RepoVersionSpec()
-    file = RepoContentRelation(via="file_spec")
-    resources = FieldProperty({str: None})
-    loading = FieldProperty(bool, if_missing=False)
-    content_hash = FieldProperty(str)
-
-    @classmethod
-    def get_by_file(cls, file, **kw):
-        query = {
-            'file_spec.path': file.path,
-            'file_spec.app_config_id': file.repo.app_config_id,
-            'file_spec.version_id': file.version_id
-        }
-        query.update(kw)
-        return cls.query.get(**query)
-
-    @classmethod
-    def upsert(cls, file):
-        alt = cls.get_by_file(file)
-        if not alt:
-            alt = cls()
-            alt.file = file
-            session(cls).flush(alt)
-        return alt
-
-    def get_alt_url(self, key=None):
-        if key and key in self.resources:
-            return self.resources[key]
-        return self.resources.get('*')

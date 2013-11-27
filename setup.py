@@ -52,6 +52,8 @@ setup(
     entry_points="""
     [paste.paster_command]
     sync_commit_hooks = vulcanrepo.command:SyncCommitHooks
-    """,
+    add_repo_visualizer_hook = vulcanrepo.command:AddRepoVisualizerHook
+
+    """
 )
 

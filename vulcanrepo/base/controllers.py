@@ -164,8 +164,7 @@ class BaseRepositoryController(BaseController):
         """
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
-            redirect(c.commit.url_for_method('file') + '/' +
-                     get_path(args, use_ext=True), **kw)
+            redirect(c.folder.url_for_rev(rev), **kw)
 
         # get cache, if available
         if g.cache:
@@ -192,7 +191,7 @@ class BaseRepositoryController(BaseController):
                 if entry["type"] == "FILE":
                     entry['extra']['size'] = h.pretty_print_file_size(
                         entry["size"])
-                    icon_url = g.visualize.get_icon_url(entry['path'])
+                    icon_url = g.visualize_url(entry['path']).get_icon_url()
                     if icon_url:
                         entry['extra']['iconURL'] = icon_url
 
@@ -296,8 +295,7 @@ class BaseRepositoryController(BaseController):
     def file(self, rev, *args, **kw):
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.file.kind == 'Folder':
-            redirect(
-                c.commit.url_for_method('folder') + '/' + '/'.join(args), **kw)
+            redirect(c.file.url_for_rev(rev), **kw)
         if kw.get('format') == 'raw':
             escape = asbool(kw.get('escape'))
             set_download_headers(c.file.name)
@@ -310,11 +308,24 @@ class BaseRepositoryController(BaseController):
             extra_params = kw.get('extra_params')
             if extra_params:
                 extra_params = urllib.unquote(extra_params)
+
+            rendered_file = g.visualize_artifact(c.file).full_render(
+                context="repo",
+                extra_params=extra_params,
+                on_unvisualizable=lambda f: redirect(c.file.raw_url()))
+            bread_crumbs = []
+            parent = c.file.parent
+            while parent:
+                bread_crumbs.append({
+                    "name": parent.name,
+                    "url": parent.url_for_rev(rev)
+                })
+                parent = parent.parent
             return dict(
                 thread=c.file.discussion_thread,
-                force_display='force' in kw,
+                rendered_file=rendered_file,
                 extra_params=extra_params,
-                rev=rev
+                bread_crumbs=bread_crumbs[::-1]
             )
 
     @expose(TEMPLATE_DIR + 'diff.html')
