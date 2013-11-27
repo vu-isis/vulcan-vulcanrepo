@@ -156,12 +156,10 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
-        """
-        TODO: Folders ending in `.json` will return the JSON structure instead
-        of the HTML page when the html page is requested.
-        A rare case but a bug nonetheless.
-        see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
-        """
+        # TODO: Folders ending in `.json` will return the JSON structure
+        # instead of the HTML page when the html page is requested.
+        # A rare case but a bug nonetheless.
+        # see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
             redirect(c.folder.url_for_rev(rev), **kw)
@@ -238,7 +236,7 @@ class BaseRepositoryController(BaseController):
                 author_content = self.Widgets.commit_author_widget.display(
                     last_commit)
                 commit_text = (
-                    '{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
+                    u'{0} <a href="{href}">[{shortlink}]</a>{summary}').format(
                         author_content,
                         summary=cgi.escape(last_commit['summary']),
                         shortlink=last_commit['shortlink'],
@@ -681,7 +679,7 @@ class RepoWebServiceAuthController(WebServiceAuthController):
         return {
             'allow_read': g.security.has_access(c.app, 'read', user=user),
             'allow_write': g.security.has_access(c.app, 'write', user=user),
-            'allow_create': g.security.has_access(c.app, 'create', user=user)
+            'allow_create': g.security.has_access(c.app, 'write', user=user)
         }
 
     @expose()
