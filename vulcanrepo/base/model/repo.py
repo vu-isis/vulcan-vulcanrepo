@@ -18,7 +18,6 @@ from ming import schema as S
 from ming.utils import LazyProperty
 from ming.odm import FieldProperty, RelationProperty, session, state
 from ming.odm.property import ORMProperty, ManyToOneJoin
-from ming.odm.declarative import MappedClass
 
 from vulcanforge.common import helpers as h
 from vulcanforge.common.model.session import repository_orm_session
@@ -32,6 +31,7 @@ from vulcanforge.artifact.model import (
     Shortlink
 )
 from vulcanforge.auth.model import User
+from vulcanforge.common.util.filesystem import import_object
 from vulcanforge.discussion.model import Thread
 from vulcanforge.project.model import AppConfig, Project
 from vulcanforge.notification.model import Notification
@@ -106,7 +106,7 @@ class RepositoryContent(ArtifactApiMixin):
         pass
 
     def url_for_method(self, method):
-        return self.commit.url_for_method(method) + self.path
+        return self.commit.url_for_method(method) + h.urlquote(self.path)
 
     def link_text_short(self):
         return self.name if self.name else '/'
@@ -135,7 +135,7 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
     folder_cls = None
 
     def url_for_rev(self, rev):
-        return self.repo.url() + 'file/' + rev + self.path
+        return self.repo.url() + 'file/' + rev + h.urlquote(self.path)
 
     def url(self):
         return self.url_for_method('file')
@@ -196,6 +196,17 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
 
     def artifact_ref_id(self):
         return self.index_id()
+
+    @classmethod
+    def find_for_task(cls, commit_cls_path, commit_id, path):
+        commit_cls = import_object(commit_cls_path)
+        ci = commit_cls.query.get(_id=commit_id)
+        return ci.get_path(path)
+
+    def get_task_lookup_args(self):
+        commit_cls_path = '{}:{}'.format(self.commit.__class__.__module__,
+                                         self.commit.__class__.__name__)
+        return [commit_cls_path, self.commit._id, self.path]
 
 
 class RepositoryFolder(RepositoryContent):

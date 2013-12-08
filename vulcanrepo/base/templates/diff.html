@@ -18,7 +18,7 @@
 {% block content %}
 {{ clone_info(c.app.repo) }}
 <div class="grid-19" style="margin-bottom: 10px;">
-    {{ g.visualize_artifact(a).full_diff(b) }}
+    {{ g.visualize_artifact(a).full_diff(b) or ("Cannot render diff for " + a.url()) }}
 </div>
 {% endblock %}
 
