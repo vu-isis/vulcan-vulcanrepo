@@ -329,15 +329,28 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'diff.html')
     def diff(self, rev, *args, **kw):
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
-        a_ci = c.app.repo.commit(kw['diff'])
-        if not a_ci:
+        original_ci = c.app.repo.commit(kw['diff'])
+        if not original_ci:
             raise exc.HTTPNotFound()
 
-        a = a_ci.get_path(c.file.path)
-        if not a:
+        original = original_ci.get_path(c.file.path)
+        if not original:
             raise exc.HTTPNotFound()
 
-        return dict(a=a, b=c.file)
+        diff_content = g.visualize_artifact(original).full_diff(
+            c.file,
+            filename1=original.name + ' ({})'.format(
+                original_ci.shorthand_id()),
+            filename2=c.file.name + ' ({})'.format(c.commit.shorthand_id())
+        )
+        if not diff_content:
+            diff_content = "Cannot render diff for " + original.url()
+
+        return {
+            "diff_content": diff_content,
+            "target": c.file,
+            "original": original
+        }
 
     @expose(TEMPLATE_DIR + 'commit.html')
     def commit(self, rev, *args, **kw):

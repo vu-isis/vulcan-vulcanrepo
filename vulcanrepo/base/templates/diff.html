@@ -3,22 +3,22 @@
 {% do g.resource_manager.register_css('visualize/vf_visualizer_embedder.scss') %}
 
 {% block title %}
-{{c.project.name}} / {{c.app.config.options.mount_label}} / Diff of {{h.really_unicode(a.path)}}
+{{c.project.name}} / {{c.app.config.options.mount_label}} / Diff of {{h.really_unicode(target.path)}}
 {% endblock %}
 
 {% block header %}Diff of
-<a href="{{b.url()}}">{{b.path}}</a>
-{% if a %}
-<a href="{{a.url()}}">{{a.commit.shorthand_id()}}</a>
+<a href="{{target.url()}}">{{target.path}}</a>
+{% if original %}
+<a href="{{original.url()}}">{{original.commit.shorthand_id()}}</a>
 ..
-<a href="{{b.url()}}">{{b.commit.shorthand_id()}}</a>
+<a href="{{target.url()}}">{{target.commit.shorthand_id()}}</a>
 {% endif %}
 {% endblock %}
 
 {% block content %}
 {{ clone_info(c.app.repo) }}
 <div class="grid-19" style="margin-bottom: 10px;">
-    {{ g.visualize_artifact(a).full_diff(b) or ("Cannot render diff for " + a.url()) }}
+    {{ diff_content }}
 </div>
 {% endblock %}
 

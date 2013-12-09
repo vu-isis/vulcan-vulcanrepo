@@ -9,7 +9,7 @@ import string
 import re
 from datetime import datetime
 from operator import itemgetter
-from itertools import chain
+from itertools import chain, izip_longest
 
 import tg
 from pylons import tmpl_context as c, app_globals as g
@@ -35,6 +35,7 @@ from vulcanforge.common.util.filesystem import import_object
 from vulcanforge.discussion.model import Thread
 from vulcanforge.project.model import AppConfig, Project
 from vulcanforge.notification.model import Notification
+from vulcanforge.taskd import model_task
 from vulcanforge.visualize.base import VisualizableMixIn
 
 from vulcanrepo.exceptions import RepoNoJoin
@@ -486,7 +487,8 @@ class Repository(Artifact):
         del self.post_commit_hooks[i]
         return True
 
-    def run_post_commit_hooks(self, commits):
+    @model_task
+    def run_post_commit_hooks(self, commit_ids):
         """
         Run post commit hooks on a sequence of commits
 
@@ -494,12 +496,16 @@ class Repository(Artifact):
         @return: None
 
         """
+        commits = [
+            self.commit_cls.query.get(repository_id=self._id, object_id=oid)
+            for oid in commit_ids]
         for hook, args, kwargs in self.get_hooks():
             log.info('Running Postcommit hook %s on %d commits' % (
                 hook.name, len(commits)))
             hook.run(commits, args=args, kwargs=kwargs)
             log.info('Hook complete')
 
+    @model_task
     def run_batched_post_commit_hooks(self, commit_ids=None):
         """
         Run post commit hooks in batches so as not to exceed available memory
@@ -511,16 +517,10 @@ class Repository(Artifact):
         if commit_ids is None:
             commit_ids = self.new_commits(True)
         log.info('Running Batch Commit Hooks on %d commits', len(commit_ids))
-        commits = []
-        for i, oid in enumerate(commit_ids):
-            ci = self.commit_cls.query.get(object_id=oid)
-            ci.set_context(self)
-            commits.append(ci)
-            if (i + 1) % self.BATCH_SIZE == 0:
-                self.run_post_commit_hooks(commits)
-                commits = []
-        if commits:
-            self.run_post_commit_hooks(commits)
+        cid_iter = izip_longest(*[iter(commit_ids)] * self.BATCH_SIZE)
+        for batch_commit_ids in cid_iter:
+            self.run_post_commit_hooks(
+                filter(lambda x: x is not None, batch_commit_ids))
         log.info('Post Commit Hooks complete')
 
     def get_hooks(self):
@@ -630,14 +630,10 @@ class Repository(Artifact):
         # Run Pluggable Post Commit Hooks
         if with_hooks:
             if all_commits:
-                self.run_batched_post_commit_hooks()
+                self.run_batched_post_commit_hooks.post()
             else:
                 # do individual queries to maintain order
-                new_commits = [
-                    self.commit_cls.query.get(
-                        repository_id=self._id, object_id=oid)
-                    for oid in new_commit_ids]
-                self.run_post_commit_hooks(new_commits)
+                self.run_post_commit_hooks.post(new_commit_ids)
 
         return len(commit_ids)
 
