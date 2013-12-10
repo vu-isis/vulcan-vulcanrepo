@@ -50,5 +50,5 @@ class SVNRestController(RootRestController, SVNRootController):
             "status": "OK"
         }
         if clone_scheme and clone_scheme in ('http', 'https', 'ssh'):
-            result["svnUrl"] = c.app.repo.clone_url(clone_scheme)
+            result["svnUrl"] = c.app.repo.clone_url(clone_scheme) + folder_path
         return result
