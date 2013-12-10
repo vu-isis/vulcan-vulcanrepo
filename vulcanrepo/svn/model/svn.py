@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import os
 import shutil
 import logging
@@ -32,6 +33,10 @@ log = logging.getLogger(__name__)
 
 
 class SVNError(RepoError):
+    pass
+
+
+class FileExists(SVNError):
     pass
 
 
@@ -420,10 +425,26 @@ class SVNRepository(Repository):
 
     def add_folder(self, dest, msg='', author=None, make_parents=True):
         dest_url = self.svn_url + dest
-        rev = self.svn.mkdir(dest_url, msg, make_parents)
-        if author:
-            self.svn.revpropset("svn:author", author, dest_url, revision=rev)
-        self.refresh()
+        cmd = lambda: self.svn.mkdir(dest_url, msg, make_parents)
+        try:
+            if author:
+                with self.with_default_username(author):
+                    cmd()
+            else:
+                cmd()
+        except pysvn.ClientError as e:
+            if 'File already exists' in e.msg:
+                raise FileExists(dest)
+            else:
+                raise
+
+    @contextmanager
+    def with_default_username(self, username):
+        self.svn.set_default_username(username)
+        try:
+            yield
+        finally:
+            self.svn.set_default_username(None)
 
 
 class SVNContentMixIn(object):

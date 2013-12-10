@@ -7,6 +7,7 @@ from vulcanrepo.base.controllers import (
     BaseRepositoryController,
     RootRestController,
     TEMPLATE_DIR)
+from vulcanrepo.svn.model.svn import FileExists
 from .widgets.svn import SVNCommitAuthor
 
 
@@ -30,11 +31,24 @@ class SVNRootController(BaseRepositoryController):
 class SVNRestController(RootRestController, SVNRootController):
 
     @require_post()
-    @expose()
-    def add_folder(self, folder_path, msg=None, **kwargs):
+    @expose('json')
+    def add_folder(self, folder_path, msg=None, clone_scheme=None, **kwargs):
         g.security.require_access(c.app, 'write')
         if not folder_path.startswith('/'):
             folder_path = '/' + folder_path
         if msg is None:
             msg = 'Added empty folder {}'.format(folder_path)
-        c.app.repo.add_folder(folder_path, msg=msg, author=c.user.username)
+        try:
+            c.app.repo.add_folder(folder_path, msg=msg, author=c.user.username)
+        except FileExists:
+            return {
+                "success": False,
+                "status": "Folder exists"
+            }
+        result = {
+            "success": True,
+            "status": "OK"
+        }
+        if clone_scheme and clone_scheme in ('http', 'https', 'ssh'):
+            result["svnUrl"] = c.app.repo.clone_url(clone_scheme)
+        return result
