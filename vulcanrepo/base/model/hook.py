@@ -166,6 +166,9 @@ class VisualizerHook(CommitPlugin):
     def on_submit(self, commit):
         for obj in commit.files_added + commit.files_modified:
             obj.trigger_vis_upload_hook()
+        for obj in commit.files_removed:
+            for pfile in obj.find_processed_files():
+                pfile.delete()
 
 
 class VisualizerManager(MultiCommitPlugin):
