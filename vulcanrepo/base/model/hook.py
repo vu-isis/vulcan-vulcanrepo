@@ -1,5 +1,4 @@
 import logging
-import bson
 import os
 import json
 
@@ -7,11 +6,12 @@ from ming import schema as S
 from ming.odm import FieldProperty, ThreadLocalODMSession, session
 from ming.odm.declarative import MappedClass
 from pylons import tmpl_context as c
-from vulcanforge.auth.schema import ACL
+from vulcanforge.auth.schema import ACL, ACE, EVERYONE
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
 from vulcanforge.common.util.filesystem import import_object
-from vulcanforge.visualize.model import Visualizer
+from vulcanforge.visualize.model import VisualizerConfig
+from vulcanforge.visualize.s3hosted import S3HostedVisualizer
 
 from vulcanrepo.tasks import purge_hook
 
@@ -40,21 +40,43 @@ class PostCommitHook(MappedClass):
     @classmethod
     def upsert(cls, obj, **kwargs):
         isnew = False
-        pch = cls.query.get(
-            module=obj.__module__, classname=obj.__name__, **kwargs)
+        cls_query = {
+            "hook_cls.module": obj.__module__,
+            "hook_cls.classname": obj.__name__
+        }
+        kwargs.update(cls_query)
+        pch = cls.query.get(**kwargs)
         if not pch:
             pch = cls.from_object(obj, **kwargs)
             isnew = True
         return pch, isnew
 
     @classmethod
-    def from_object(cls, obj, **kwargs):
-        return cls(
+    def from_object(cls, obj, acl=None, description=None, **kwargs):
+        if description is None:
+            description = getattr(obj, "description", '')
+        if acl is None:
+            acl = getattr(obj, "acl", [
+                ACE.allow(EVERYONE, 'read'),
+                ACE.allow(EVERYONE, 'install')
+            ])
+        inst = cls(
             hook_cls={
                 "module": obj.__module__,
                 "classname": obj.__name__
             },
+            description=description,
+            acl=acl,
             **kwargs)
+        inst.description = getattr(obj, "description", '')
+        return inst
+
+    @property
+    def hook(self):
+        """return hook class (uninstantiated)"""
+        path = '{}:{}'.format(self.hook_cls.module, self.hook_cls.classname)
+        cls = import_object(path)
+        return cls
 
     def delete(self):
         purge_hook.post(self._id)
@@ -66,9 +88,7 @@ class PostCommitHook(MappedClass):
         full_kw = self.default_kwargs.copy()
         if kwargs:
             full_kw.update(kwargs)
-        path = '{}:{}'.format(self.hook_cls.module, self.hook_cls.classname)
-        cls = import_object(path)
-        plugin = cls(*args, **full_kw)
+        plugin = self.hook(*args, **full_kw)
         self._run_plugin(plugin, commits)
 
     def _run_plugin(self, plugin, commits):
@@ -141,15 +161,25 @@ class PostCommitError(Exception):
     pass
 
 
-class VisualizerManager(MultiCommitPlugin):
-    """This is a bit inefficient, but is the easiest way to sync"""
+class VisualizerHook(CommitPlugin):
+    """Calls on_upload hook for visualizers"""
+    def on_submit(self, commit):
+        for obj in commit.files_added + commit.files_modified:
+            obj.trigger_vis_upload_hook()
+        for obj in commit.files_removed:
+            for pfile in obj.find_processed_files():
+                pfile.delete()
 
-    def __init__(self, visualizer_shortname, restrict_branch_to='master',
-                 **kw):
-        self.visualizer = Visualizer.query.get(
-            shortname=visualizer_shortname)
-        if not self.visualizer:
-            self.visualizer = Visualizer(shortname=visualizer_shortname)
+
+class VisualizerManager(MultiCommitPlugin):
+    """Syncs repo content with a S3HostedVisualizer"""
+
+    def __init__(self, visualizer_shortname, restrict_branch_to='master'):
+        vis_config = VisualizerConfig.query.get(shortname=visualizer_shortname)
+        if not vis_config:
+            vis_config = VisualizerConfig.from_visualizer(
+                S3HostedVisualizer, shortname=visualizer_shortname)
+        self.visualizer = vis_config.load()
         self.restrict_branch_to = restrict_branch_to
         super(VisualizerManager, self).__init__()
 
@@ -160,9 +190,6 @@ class VisualizerManager(MultiCommitPlugin):
         return valid
 
     def init_from_commit(self, commit):
-        bundle_content = []
-        self.visualizer.delete_s3_keys()
-
         # find the manifest
         for obj in commit.tree.walk(ignore=['.git', '.svn']):
             if obj.name == 'manifest.json':
@@ -184,14 +211,7 @@ class VisualizerManager(MultiCommitPlugin):
                 path = os.path.relpath(obj.path, root_path)
                 if self.visualizer.can_upload(path):
                     LOG.info('adding {} to visualizer content'.format(path))
-                    bundle_content.append(path)
-                    key = self.visualizer.get_s3_key(path)
-                    key.set_contents_from_string(obj.open().read())
-
-        self.visualizer.bundle_content = bundle_content
-        LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
-        session(Visualizer).flush(self.visualizer)
-        LOG.info('bundle content {}'.format(self.visualizer.bundle_content))
+                    self.visualizer.upload_file(path, obj)
 
     def on_submit(self, commits):
         #if not self.visualizer.bundle_content:

@@ -8,7 +8,7 @@ from ming.utils import LazyProperty
 from ming.odm.odmsession import ThreadLocalODMSession
 from vulcanforge.common.types import ConfigOption, SitemapEntry
 from vulcanforge.common.util import push_config
-from vulcanforge.common.util.decorators import exceptionless
+from vulcanforge.common.util.exception import exceptionless
 from vulcanforge.project.model import Project
 from vulcanforge.resources import Icon
 

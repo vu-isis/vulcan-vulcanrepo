@@ -4,8 +4,6 @@ import logging
 from ming.odm import ThreadLocalODMSession
 from pylons import tmpl_context as c
 
-from vulcanforge.common.exceptions import ForgeError
-from vulcanforge.artifact.model import ArtifactProcessor
 from vulcanforge.common.util.model import chunked_find
 from vulcanforge.notification.model import Notification
 from vulcanforge.project.model import Project
@@ -54,39 +52,6 @@ def uninstall(**kwargs):
 
 
 @task
-def nop():
-    log = logging.getLogger(__name__)
-    log.info('nop')
-
-
-@task
-def process_file(processor_name, context, commit, path, force=False):
-    from vulcanrepo.base.model import RepoAlternate
-
-    LOG.info('processing file at {} using {} processor'.format(
-        path, processor_name))
-
-    ci = c.app.repo.commit(commit)
-    file = ci.get_path(path)
-    if not file:
-        raise ForgeError('file not found at {}:{}'.format(commit, path))
-
-    found = False
-    if not force:
-        identical_alt = RepoAlternate.query.find({
-            'content_hash': file.get_content_hash(),
-            'resources.{}'.format(context): {'$exists': 1}
-        }).first()
-        if identical_alt:
-            file.set_alt_resource(
-                context, identical_alt.resources[context], flush=True)
-            found = True
-
-    if not found:
-        ArtifactProcessor.process(processor_name, file, context)
-
-
-@task
 def purge_hook(hook_id):
     for projects in chunked_find(Project):
         for project in projects:
@@ -100,4 +65,3 @@ def purge_hook(hook_id):
                     if len(hooks) != len(c.app.repo.post_commit_hooks):
                         c.app.repo.post_commit_hooks = hooks
         ThreadLocalODMSession.flush_all()
-        ThreadLocalODMSession.close_all()

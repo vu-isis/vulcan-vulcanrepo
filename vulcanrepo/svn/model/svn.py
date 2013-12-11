@@ -172,24 +172,28 @@ class SVNCommit(Commit):
                             removed_paths.add(child.path)
         return removed
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
         result = None
         if not path.startswith('/'):
             path = '/' + path
-        try:
-            info = self.repo.svn.list(
-                self.repo.svn_url + path,
-                revision=self.svn_revision,
-                peg_revision=self.svn_revision,
-                recurse=False
-            )
-        except pysvn.ClientError:
-            pass
+        if verify:
+            try:
+                info = self.repo.svn.list(
+                    self.repo.svn_url + path,
+                    revision=self.svn_revision,
+                    peg_revision=self.svn_revision,
+                    recurse=False
+                )
+            except pysvn.ClientError:
+                pass
+            else:
+                result = make_content_object(info[0][0], self)
+                if result.kind == 'Folder':
+                    result._listing = info
+            return result
         else:
-            result = make_content_object(info[0][0], self)
-            if result.kind == 'Folder':
-                result._listing = info
-        return result
+            content_cls = SVNFolder if path.endswith('/') else SVNFile
+            return content_cls(self, path)
 
 
 class SVNRepository(Repository):

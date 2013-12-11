@@ -7,9 +7,6 @@ import cgi
 from markupsafe import Markup
 
 from ming.odm import session
-from vulcanforge.auth.model import User
-from vulcanforge.common.controllers.rest import WebServiceAuthController
-from vulcanforge.common.validators import DateTimeConverter
 from webob import exc
 from formencode import validators
 from paste.deploy.converters import asbool
@@ -17,6 +14,9 @@ from pylons import tmpl_context as c, app_globals as g, request, response
 from tg import redirect, expose, flash, validate
 from tg.decorators import with_trailing_slash, without_trailing_slash
 from boto.exception import S3ResponseError
+from vulcanforge.common.controllers.rest import WebServiceAuthController
+from vulcanforge.common.util.controller import get_remainder_path
+from vulcanforge.common.validators import DateTimeConverter
 from vulcanforge.common.controllers import BaseController
 from vulcanforge.common.controllers.decorators import require_post
 from vulcanforge.common import helpers as h
@@ -31,6 +31,7 @@ from vulcanforge.artifact.controllers import (
 )
 from vulcanforge.artifact.model import Feed, ArtifactReference
 from vulcanforge.artifact.widgets import RelatedArtifactsWidget
+from vulcanforge.auth.model import User
 from vulcanforge.cache.decorators import cache_rendered
 from vulcanforge.config.render.jsonify import JSONSafe
 from vulcanforge.discussion.controllers import AppDiscussionController
@@ -39,11 +40,6 @@ from vulcanforge.neighborhood.model import Neighborhood
 from vulcanforge.project.exceptions import NoSuchProjectError
 from vulcanforge.project.model import Project
 from vulcanforge.stats import STATS_CACHE_TIMEOUT
-from vulcanforge.visualize.model import Visualizer
-from vulcanforge.visualize.widgets.visualize import (
-    DiffVisualizer,
-    ArtifactEmbedVisualizer
-)
 
 from vulcanrepo import tasks as repo_tasks
 from vulcanrepo.stats import CommitAggregator, CommitQuerySchema
@@ -69,18 +65,10 @@ def get_commit(rev, args, depth=10):
     return commit, rev, args
 
 
-def get_path(args, use_ext=False):
-    path = u'/' + u'/'.join([a.decode('utf8') for a in args])
-    if use_ext and request.response_ext:
-        if not os.path.basename(request.path) == os.path.basename(path):
-            path += request.response_ext.decode('utf8')
-    return path
-
-
 def get_commit_and_obj(rev, *args, **kw):
     """Get commit and file/folder object from rev and args"""
     commit, rev, args = get_commit(rev, args)
-    path = get_path(args, kw.get('use_ext', False))
+    path = get_remainder_path(args, kw.get('use_ext', False))
     obj = commit.get_path(path)
     if not obj:
         raise exc.HTTPNotFound()
@@ -93,7 +81,7 @@ class S3ProxyController(BaseController):
     @expose()
     def resource(self, *args, **kw):
         g.security.require_access(c.app, 'read')
-        key_name = get_path(map(h.urlquote, args), use_ext=True)
+        key_name = get_remainder_path(map(h.urlquote, args))
         LOG.info('getting repo s3 key at %s', key_name)
         try:
             key = g.s3_bucket.get_key(key_name)
@@ -139,14 +127,11 @@ class RepoStatsController(BaseController):
 
 
 class BaseRepositoryController(BaseController):
-    _s3_proxy = S3ProxyController()
     stats = RepoStatsController()
 
     class Widgets(BaseController.Widgets):
         commit_browser_widget = SCMCommitBrowserWidget()
         commit_author_widget = CommitAuthorWidget()
-        diff_widget = DiffVisualizer()
-        visualizer_widget = ArtifactEmbedVisualizer()
         log_widget = SCMLogWidget()
         thread_widget = vulcanforge.discussion.widgets.ThreadWidget(
             page=None, limit=None, page_size=None, count=None, style='linear')
@@ -177,8 +162,7 @@ class BaseRepositoryController(BaseController):
         # see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.folder.kind == 'File':
-            redirect(c.commit.url_for_method('file') + '/' +
-                     get_path(args, use_ext=True), **kw)
+            redirect(c.folder.url_for_rev(rev), **kw)
 
         # get cache, if available
         if g.cache:
@@ -205,10 +189,9 @@ class BaseRepositoryController(BaseController):
                 if entry["type"] == "FILE":
                     entry['extra']['size'] = h.pretty_print_file_size(
                         entry["size"])
-                    visualizers = Visualizer.get_for_resource(
-                        entry["path"], cache=True)
-                    if len(visualizers) > 0:
-                        entry['extra']['iconURL'] = visualizers[0].icon_url
+                    icon_url = g.visualize_url(entry['path']).get_icon_url()
+                    if icon_url:
+                        entry['extra']['iconURL'] = icon_url
 
                 data[entry["path"]] = entry
 
@@ -310,8 +293,7 @@ class BaseRepositoryController(BaseController):
     def file(self, rev, *args, **kw):
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.file.kind == 'Folder':
-            redirect(
-                c.commit.url_for_method('folder') + '/' + '/'.join(args), **kw)
+            redirect(c.file.url_for_rev(rev), **kw)
         if kw.get('format') == 'raw':
             escape = asbool(kw.get('escape'))
             set_download_headers(c.file.name)
@@ -320,31 +302,55 @@ class BaseRepositoryController(BaseController):
             return iter(c.file.open())
         else:
             c.related_artifacts_widget = self.Widgets.related_artifacts_widget
-            c.visualizer_widget = self.Widgets.visualizer_widget
             c.thread = self.Widgets.thread_widget
             extra_params = kw.get('extra_params')
             if extra_params:
                 extra_params = urllib.unquote(extra_params)
+
+            rendered_file = g.visualize_artifact(c.file).full_render(
+                context="repo",
+                extra_params=extra_params,
+                on_unvisualizable=lambda f: redirect(c.file.raw_url()))
+            bread_crumbs = []
+            parent = c.file.parent
+            while parent:
+                bread_crumbs.append({
+                    "name": parent.name,
+                    "url": parent.url_for_rev(rev)
+                })
+                parent = parent.parent
             return dict(
                 thread=c.file.discussion_thread,
-                force_display='force' in kw,
+                rendered_file=rendered_file,
                 extra_params=extra_params,
-                rev=rev
+                bread_crumbs=bread_crumbs[::-1]
             )
 
     @expose(TEMPLATE_DIR + 'diff.html')
     def diff(self, rev, *args, **kw):
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
-        a_ci = c.app.repo.commit(kw['diff'])
-        if not a_ci:
+        original_ci = c.app.repo.commit(kw['diff'])
+        if not original_ci:
             raise exc.HTTPNotFound()
 
-        a = a_ci.get_path(c.file.path)
-        if not a:
+        original = original_ci.get_path(c.file.path)
+        if not original:
             raise exc.HTTPNotFound()
 
-        c.diff_widget = self.Widgets.diff_widget
-        return dict(a=a, b=c.file)
+        diff_content = g.visualize_artifact(original).full_diff(
+            c.file,
+            filename1=original.name + ' ({})'.format(
+                original_ci.shorthand_id()),
+            filename2=c.file.name + ' ({})'.format(c.commit.shorthand_id())
+        )
+        if not diff_content:
+            diff_content = "Cannot render diff for " + original.url()
+
+        return {
+            "diff_content": diff_content,
+            "target": c.file,
+            "original": original
+        }
 
     @expose(TEMPLATE_DIR + 'commit.html')
     def commit(self, rev, *args, **kw):
@@ -358,7 +364,7 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'log.html')
     def history(self, rev, *args, **kw):
         c.commit, rev, _ = get_commit(rev, args)
-        path = get_path(args, use_ext=True)
+        path = get_remainder_path(args)
         if path == '/':
             path = None
 
