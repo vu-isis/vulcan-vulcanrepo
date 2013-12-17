@@ -437,7 +437,7 @@ class SVNRepository(Repository):
             else:
                 cmd()
         except pysvn.ClientError as e:
-            if 'File already exists' in e.msg:
+            if 'File already exists' in e.message:
                 raise FileExists(dest)
             else:
                 raise
