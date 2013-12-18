@@ -192,7 +192,7 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
             src.close()
         return self.name
 
-    def unique_id(self):
+    def get_unique_id(self):
         return self.index_id()
 
     def artifact_ref_id(self):
