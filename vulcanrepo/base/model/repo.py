@@ -773,17 +773,20 @@ class Commit(Artifact):
     def files_added(self):
         added_paths = set()
         added = []
-        for path in self.paths_added:
-            if path not in added_paths:
-                added_paths.add(path)
-                obj = self.get_path(path, verify=False)
-                if obj.kind == 'File':
-                    added.append(obj)
+
+        def add_path(added_path):
+            if added_path not in added_paths:
+                added_paths.add(added_path)
+                added_obj = self.get_path(added_path, verify=False)
+                if added_obj.kind == 'File':
+                    added.append(added_obj)
                 else:
-                    for child in obj.find_files():
-                        if child.path not in added_paths:
-                            added_paths.add(child.path)
-                            added.append(child)
+                    for child in added_obj.find_files():
+                        add_path(child.path)
+
+        for path in self.paths_added:
+            add_path(path)
+
         return added
 
     @property
