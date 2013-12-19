@@ -114,7 +114,7 @@ class RepositoryApp(Application):
     }
     default_acl = {
         'Admin': ['admin'],
-        'Developer': ['create', 'write', 'moderate'],
+        'Developer': ['write', 'moderate'],
         '*authenticated': ['post', 'unmoderated_post'],
         '*anonymous': ['read']
     }
