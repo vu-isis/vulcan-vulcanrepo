@@ -113,7 +113,7 @@ class RepositoryApp(Application):
         "Browse repository": {"url": ""}
     }
     default_acl = {
-        'Admin': ['configure', 'admin'],
+        'Admin': ['admin'],
         'Developer': ['create', 'write', 'moderate'],
         '*authenticated': ['post', 'unmoderated_post'],
         '*anonymous': ['read']
