@@ -301,16 +301,20 @@ class BaseRepositoryController(BaseController):
                 return iter(cgi.escape(c.file.read()))
             return iter(c.file.open())
         else:
+            # setup the context
             c.related_artifacts_widget = self.Widgets.related_artifacts_widget
             c.thread = self.Widgets.thread_widget
             extra_params = kw.get('extra_params')
             if extra_params:
                 extra_params = urllib.unquote(extra_params)
 
+            # Render the file
             rendered_file = g.visualize_artifact(c.file).full_render(
                 context="repo",
                 extra_params=extra_params,
                 on_unvisualizable=lambda f: redirect(c.file.raw_url()))
+
+            # Get the bread crumbs
             bread_crumbs = []
             parent = c.file.parent
             while parent:
@@ -319,12 +323,13 @@ class BaseRepositoryController(BaseController):
                     "url": parent.url_for_rev(rev)
                 })
                 parent = parent.parent
-            return dict(
-                thread=c.file.discussion_thread,
-                rendered_file=rendered_file,
-                extra_params=extra_params,
-                bread_crumbs=bread_crumbs[::-1]
-            )
+
+            return {
+                'thread': c.file.discussion_thread,
+                'rendered_file': rendered_file,
+                'extra_params': extra_params,
+                'bread_crumbs': bread_crumbs[::-1]
+            }
 
     @expose(TEMPLATE_DIR + 'diff.html')
     def diff(self, rev, *args, **kw):
