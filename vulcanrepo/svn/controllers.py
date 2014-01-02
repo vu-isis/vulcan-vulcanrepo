@@ -43,7 +43,8 @@ class SVNRestController(RootRestController, SVNRootController):
         except FileExists:
             return {
                 "success": False,
-                "status": "Folder already exists!"
+                "status": "Folder already exists!",
+                "code": "error01"
             }
         result = {
             "success": True,
