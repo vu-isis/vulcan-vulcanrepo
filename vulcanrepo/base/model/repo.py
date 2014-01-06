@@ -193,7 +193,8 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
         return self.name
 
     def get_unique_id(self):
-        return self.index_id()
+        return 'RepoVersion' + '.'.join(
+            (str(self.app_config_id), self.path, self.version_id))
 
     def artifact_ref_id(self):
         return self.index_id()
