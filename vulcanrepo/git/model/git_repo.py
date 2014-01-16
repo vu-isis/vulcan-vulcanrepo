@@ -2,7 +2,7 @@ import os
 import shutil
 import logging
 import subprocess
-from datetime import datetime
+from datetime import datetime, time
 from collections import deque
 from itertools import chain, ifilter
 
@@ -132,13 +132,16 @@ class GitCommit(Commit):
             return None
         return obj
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
         if path == '/':
             return self.tree
 
-        obj = self.get_obj_from_path(path)
-        if obj:
-            return make_content_object(obj, self)
+        if verify:
+            obj = self.get_obj_from_path(path)
+            if obj:
+                return make_content_object(obj, self)
+        else:
+            return GitFile(self, path)
 
     @property
     def files_removed(self):
@@ -177,7 +180,7 @@ class GitRepository(Repository):
     repo_id = 'git'
     type_s = 'Git Repository'
     url_map = {
-        'ro': 'git://git.{host}{path}',
+        'ro': 'git://{host}{path}',
         'rw': 'ssh://{username}@{host}{path}',
         'https': 'https://{username}@{host}{path}',
         'https_anon': 'https://{host}{path}'
@@ -488,6 +491,13 @@ class GitContentMixin(object):
         if oid:
             return GitCommit.query.get(
                 object_id=oid, repository_id=self.repo._id)
+
+    def get_timestamp(self):
+        """return POSIX timestamp of last modified time"""
+        ci = self.get_last_commit()
+        if ci:
+            dt = ci.committed["date"]
+            return time.mktime(dt.timetuple())
 
 
 class GitFolder(RepositoryFolder, GitContentMixin):

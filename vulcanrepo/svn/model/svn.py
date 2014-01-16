@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import os
 import shutil
 import logging
@@ -32,6 +33,10 @@ log = logging.getLogger(__name__)
 
 
 class SVNError(RepoError):
+    pass
+
+
+class FileExists(SVNError):
     pass
 
 
@@ -167,24 +172,28 @@ class SVNCommit(Commit):
                             removed_paths.add(child.path)
         return removed
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
         result = None
         if not path.startswith('/'):
             path = '/' + path
-        try:
-            info = self.repo.svn.list(
-                self.repo.svn_url + path,
-                revision=self.svn_revision,
-                peg_revision=self.svn_revision,
-                recurse=False
-            )
-        except pysvn.ClientError:
-            pass
+        if verify:
+            try:
+                info = self.repo.svn.list(
+                    self.repo.svn_url + path,
+                    revision=self.svn_revision,
+                    peg_revision=self.svn_revision,
+                    recurse=False
+                )
+            except pysvn.ClientError:
+                pass
+            else:
+                result = make_content_object(info[0][0], self)
+                if result.kind == 'Folder':
+                    result._listing = info
+            return result
         else:
-            result = make_content_object(info[0][0], self)
-            if result.kind == 'Folder':
-                result._listing = info
-        return result
+            content_cls = SVNFolder if path.endswith('/') else SVNFile
+            return content_cls(self, path)
 
 
 class SVNRepository(Repository):
@@ -200,7 +209,7 @@ class SVNRepository(Repository):
     type_s = 'SVN Repository'
     MAX_MEM_READ = 50 * 10 ** 6
     url_map = {
-        'ro': 'http://svn.{domain}{path}',
+        'ro': 'http://{domain}{path}',
         'rw': 'svn+ssh://{username}@{domain}{path}',
         'https': 'https://{username}@{domain}{path}',
         'https_anon': 'https://{domain}{path}'
@@ -212,7 +221,7 @@ class SVNRepository(Repository):
 
     @LazyProperty
     def svn_url(self):
-        return 'file://%s/%s' % (self.fs_path, self.name)
+        return u'file://%s/%s' % (self.fs_path, self.name)
 
     def init(self):
         fullname = self._setup_paths()
@@ -344,15 +353,15 @@ class SVNRepository(Repository):
             pysvn.opt_revision_kind.number,
             ci.commit_num - 1)
         for path in log_entry.changed_paths:
-            p = path.path
+            p = path.path.decode('utf8')
             rev = parent_rev if path.action == 'D' else ci.svn_revision
             is_file = self._is_file(p, rev)
             if not is_file:
-                p += '/'
+                p += u'/'
             if path.copyfrom_path:
                 from_p = path.copyfrom_path
                 if not is_file:
-                    from_p += '/'
+                    from_p += u'/'
                 ci.diffs.copied.append({
                     'old': h.really_unicode(from_p),
                     'new': h.really_unicode(p)
@@ -418,6 +427,29 @@ class SVNRepository(Repository):
             self.svn.revpropset("svn:author", author, dest_url, revision=rev)
         self.refresh()
 
+    def add_folder(self, dest, msg='', author=None, make_parents=True):
+        dest_url = self.svn_url + dest
+        cmd = lambda: self.svn.mkdir(dest_url, msg, make_parents)
+        try:
+            if author:
+                with self.with_default_username(author):
+                    cmd()
+            else:
+                cmd()
+        except pysvn.ClientError as e:
+            if 'File already exists' in e.message:
+                raise FileExists(dest)
+            else:
+                raise
+
+    @contextmanager
+    def with_default_username(self, username):
+        self.svn.set_default_username(username)
+        try:
+            yield
+        finally:
+            self.svn.set_default_username(None)
+
 
 class SVNContentMixIn(object):
     # these are set by the mixee
@@ -458,6 +490,10 @@ class SVNContentMixIn(object):
             log = self.commit.log(1, 1, path=self.path, revision_end=rev_end)
             if log:
                 return log[0]
+
+    def get_timestamp(self):
+        """return POSIX timestamp of last modified time"""
+        return self._info.time
 
 
 class SVNFolder(RepositoryFolder, SVNContentMixIn):

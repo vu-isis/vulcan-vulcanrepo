@@ -3,7 +3,6 @@ from .repo import (
     Commit,
     RepositoryFile,
     RepositoryFolder,
-    RepoAlternate,
     RepoCommitPathSpec,
     RepoVersionSpec,
     RepoContentRelation,

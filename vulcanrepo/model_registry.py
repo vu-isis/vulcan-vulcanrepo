@@ -1,7 +1,6 @@
 from vulcanrepo.base.model import (
     Repository,
     Commit,
-    RepoAlternate,
     PostCommitHook,
     RepositoryThread
 )
