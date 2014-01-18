@@ -427,7 +427,7 @@ class Repository(Artifact):
         e.g., for use in a clone/checkout command
 
         """
-        if not username and c.user not in (None, User.anonymous()):
+        if not username and c.user and not c.user.is_anonymous:
             username = c.user.username
         scheme_map = {
             'ro': 'http',

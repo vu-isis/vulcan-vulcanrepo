@@ -242,7 +242,7 @@ class SVNRepository(Repository):
         if category in ('ro', 'https_anon'):
             cmd = 'svn checkout {source_url} {dest_path}'
         else:
-            if not username and c.user not in (None, User.anonymous()):
+            if not username and c.user and not c.user.is_anonymous:
                 username = c.user.username
             cmd0 = 'svn checkout --username={username}'.format(
                 username=username)
