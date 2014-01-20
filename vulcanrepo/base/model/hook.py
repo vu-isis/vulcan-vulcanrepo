@@ -195,10 +195,12 @@ class VisualizerManager(MultiCommitPlugin):
             if obj.name == 'manifest.json':
                 manifest_json = json.loads(obj.open().read())
                 root_path = os.path.dirname(obj.path)
+                LOG.info('manifest.json found at %s', obj.path)
                 break
         else:
             manifest_json = None
             root_path = '/'
+            LOG.info('No manifest.json found in repo %s', commit.repo.url())
 
         # update from manifest
         if manifest_json:
@@ -214,7 +216,8 @@ class VisualizerManager(MultiCommitPlugin):
                     self.visualizer.upload_file(path, obj)
 
     def on_submit(self, commits):
-        #if not self.visualizer.bundle_content:
+        # loop through the commits backwards until one is found on a valid
+        # branch, if any
         for commit in commits[::-1]:
             if self.is_valid_branch(commit):
                 self.init_from_commit(commit)
