@@ -3,9 +3,9 @@ import os
 import json
 
 from ming import schema as S
-from ming.odm import FieldProperty, ThreadLocalODMSession, session
+from ming.odm import FieldProperty, ThreadLocalODMSession
 from ming.odm.declarative import MappedClass
-from pylons import tmpl_context as c
+from pylons import tmpl_context as c, app_globals as g
 from vulcanforge.auth.schema import ACL, ACE, EVERYONE
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
@@ -214,6 +214,8 @@ class VisualizerManager(MultiCommitPlugin):
                 if self.visualizer.can_upload(path):
                     LOG.info('adding {} to visualizer content'.format(path))
                     self.visualizer.upload_file(path, obj)
+
+        g.visualizer_mapper.invalidate_cache()
 
     def on_submit(self, commits):
         # loop through the commits backwards until one is found on a valid
