@@ -143,7 +143,7 @@
                 },
 
                 getDataForPath: function (path, callback) {
-                    var dataURL = repoURL + 'folder/' + oid + path.slice(0, -1) + '.json',
+                    var dataURL = repoURL + 'folder/' + oid + path.slice(0, -1),
                         actionList;
                     $.ajax({
                         url: dataURL,
@@ -195,7 +195,7 @@
 {% endblock %}
 
 {% block actions %}
-{% if c.user and c.user != c.user.anonymous() %}
+{% if c.user and not c.user.is_anonymous %}
     {{ g.subscription_popup_menu.display(feed_url=c.app.url + 'feed') }}
 {% endif %}
 {% endblock %}

@@ -111,7 +111,7 @@
     <div id="repo-access-urls" class="padded-block">
        <label for="repo-access-url">repository url</label>
        <select id="repo-access-type" class="access_type">
-        {% if g.security.has_access(c.app, 'write') or (c.user._id != c.user.anonymous()._id and g.security.has_access(c.app, 'read')) %}
+        {% if g.security.has_access(c.app, 'write') or (not c.user.is_anonymous and g.security.has_access(c.app, 'read')) %}
             {% if c.user.public_key %}
             <option value="{{repo.clone_url('rw')}}">(SSH)</option>
             {% endif %}

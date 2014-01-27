@@ -9,7 +9,7 @@ import string
 import re
 from datetime import datetime
 from operator import itemgetter
-from itertools import chain
+from itertools import chain, izip_longest
 
 import tg
 from pylons import tmpl_context as c, app_globals as g
@@ -18,7 +18,6 @@ from ming import schema as S
 from ming.utils import LazyProperty
 from ming.odm import FieldProperty, RelationProperty, session, state
 from ming.odm.property import ORMProperty, ManyToOneJoin
-from ming.odm.declarative import MappedClass
 
 from vulcanforge.common import helpers as h
 from vulcanforge.common.model.session import repository_orm_session
@@ -32,9 +31,12 @@ from vulcanforge.artifact.model import (
     Shortlink
 )
 from vulcanforge.auth.model import User
+from vulcanforge.common.util.filesystem import import_object
 from vulcanforge.discussion.model import Thread
 from vulcanforge.project.model import AppConfig, Project
 from vulcanforge.notification.model import Notification
+from vulcanforge.taskd import model_task
+from vulcanforge.visualize.base import VisualizableMixIn
 
 from vulcanrepo.exceptions import RepoNoJoin
 from .hook import PostCommitHook
@@ -81,6 +83,9 @@ class RepositoryContent(ArtifactApiMixin):
     def repo(self):
         return self.commit.repo
 
+    def url_for_rev(self, rev):
+        raise NotImplementedError('url_for_rev')
+
     def ls_entry(self, escape=False):
         name = h.really_unicode(self.name)
         path = self.path
@@ -111,7 +116,7 @@ class RepositoryContent(ArtifactApiMixin):
         pass
 
     def url_for_method(self, method):
-        return self.commit.url_for_method(method) + self.path
+        return self.commit.url_for_method(method) + h.urlquote(self.path)
 
     def link_text_short(self):
         return self.name if self.name else u'/'
@@ -132,12 +137,15 @@ class RepositoryContent(ArtifactApiMixin):
         ))
 
 
-class RepositoryFile(RepositoryContent):
+class RepositoryFile(RepositoryContent, VisualizableMixIn):
     """Facade for interacting with a repository file"""
     kind = 'File'
     type_s = 'Blob'
     link_type = 'file'
     folder_cls = None
+
+    def url_for_rev(self, rev):
+        return self.repo.url() + 'file/' + rev + h.urlquote(self.path)
 
     def url(self):
         return self.url_for_method('file')
@@ -156,6 +164,9 @@ class RepositoryFile(RepositoryContent):
     def open(self):
         raise NotImplementedError('open')
 
+    def read(self):
+        raise NotImplementedError('read')
+
     def ls_entry(self, escape=False):
         entry = super(RepositoryFile, self).ls_entry(escape=escape)
         entry.update({
@@ -167,48 +178,7 @@ class RepositoryFile(RepositoryContent):
     @LazyProperty
     def parent(self):
         parent_path = os.path.dirname(self.path)
-        if not parent_path.endswith('/'):
-            parent_path += '/'
         return self.folder_cls(self.commit, parent_path)
-
-    @LazyProperty
-    def alt_object(self):
-        return RepoAlternate.get_by_file(self)
-
-    def get_alt_resource(self, key, **kw):
-        if self.alt_object:
-            r = self.alt_object.get_alt_url(key)
-            if isinstance(r, dict) and 'key' in r:
-                r = '{}_s3_proxy/resource/{}'.format(self.repo.url(), r['key'])
-            return r
-
-    def set_alt_resource(self, key, url=None, file=None, flush=False, **kw):
-        if file and not url:
-            url = ArtifactApiMixin._process_alt_file(self, file, **kw)
-        self.alt_object = RepoAlternate.upsert(self)
-        self.alt_object.resources[key] = url
-        self.alt_object.loading = False
-        if not self.alt_object.content_hash:
-            self.alt_object.content_hash = self.get_content_hash()
-        if flush:
-            session(RepoAlternate).flush(self.alt_object)
-
-    def _get_alt_loading(self):
-        if self.alt_object:
-            return self.alt_object.loading
-        return False
-
-    def _set_alt_loading(self, loading):
-        self.alt_object = RepoAlternate.upsert(self)
-        self.alt_object.loading = loading
-
-    alt_loading = property(_get_alt_loading, _set_alt_loading)
-
-    def url_for_visualizer(self):
-        return self.get_alt_resource('visualizer') or self.raw_url()
-
-    def alternate_rest_url(self):
-        return '/rest' + self.url_for_method('alternate')
 
     def get_content_hash(self):
         raise NotImplementedError('get_content_hash')
@@ -233,6 +203,24 @@ class RepositoryFile(RepositoryContent):
             src.close()
         return self.name
 
+    def get_unique_id(self):
+        return 'RepoVersion' + '.'.join(
+            (str(self.app_config_id), self.path, self.version_id))
+
+    def artifact_ref_id(self):
+        return self.index_id()
+
+    @classmethod
+    def find_for_task(cls, commit_cls_path, commit_id, path):
+        commit_cls = import_object(commit_cls_path)
+        ci = commit_cls.query.get(_id=commit_id)
+        return ci.get_path(path)
+
+    def get_task_lookup_args(self):
+        commit_cls_path = '{}:{}'.format(self.commit.__class__.__module__,
+                                         self.commit.__class__.__name__)
+        return [commit_cls_path, self.commit._id, self.path]
+
 
 class RepositoryFolder(RepositoryContent):
     """Facade for interacting with a repository folder"""
@@ -244,6 +232,9 @@ class RepositoryFolder(RepositoryContent):
             path += '/'
         self.name = path.rsplit('/', 2)[-2]
         super(RepositoryFolder, self).__init__(commit, path)
+
+    def url_for_rev(self, rev):
+        return self.repo.url() + 'folder/' + rev + self.path
 
     def url(self):
         return self.url_for_method('folder')
@@ -293,6 +284,12 @@ class RepositoryFolder(RepositoryContent):
             if not obj.name in ignore:
                 obj.get_content_to_folder(path, ignore=ignore)
         return self.name
+
+    @LazyProperty
+    def parent(self):
+        if self.path != '/':
+            parent_path = os.path.normpath(os.path.join(self.path, os.pardir))
+            return self.__class__(self.commit, parent_path)
 
 
 class Repository(Artifact):
@@ -441,7 +438,7 @@ class Repository(Artifact):
         e.g., for use in a clone/checkout command
 
         """
-        if not username and c.user not in (None, User.anonymous()):
+        if not username and c.user and not c.user.is_anonymous:
             username = c.user.username
         scheme_map = {
             'ro': 'http',
@@ -501,7 +498,8 @@ class Repository(Artifact):
         del self.post_commit_hooks[i]
         return True
 
-    def run_post_commit_hooks(self, commits):
+    @model_task
+    def run_post_commit_hooks(self, commit_ids):
         """
         Run post commit hooks on a sequence of commits
 
@@ -509,12 +507,16 @@ class Repository(Artifact):
         @return: None
 
         """
+        commits = [
+            self.commit_cls.query.get(repository_id=self._id, object_id=oid)
+            for oid in commit_ids]
         for hook, args, kwargs in self.get_hooks():
             log.info('Running Postcommit hook %s on %d commits' % (
                 hook.name, len(commits)))
             hook.run(commits, args=args, kwargs=kwargs)
             log.info('Hook complete')
 
+    @model_task
     def run_batched_post_commit_hooks(self, commit_ids=None):
         """
         Run post commit hooks in batches so as not to exceed available memory
@@ -526,16 +528,10 @@ class Repository(Artifact):
         if commit_ids is None:
             commit_ids = self.new_commits(True)
         log.info('Running Batch Commit Hooks on %d commits', len(commit_ids))
-        commits = []
-        for i, oid in enumerate(commit_ids):
-            ci = self.commit_cls.query.get(object_id=oid)
-            ci.set_context(self)
-            commits.append(ci)
-            if (i + 1) % self.BATCH_SIZE == 0:
-                self.run_post_commit_hooks(commits)
-                commits = []
-        if commits:
-            self.run_post_commit_hooks(commits)
+        cid_iter = izip_longest(*[iter(commit_ids)] * self.BATCH_SIZE)
+        for batch_commit_ids in cid_iter:
+            self.run_post_commit_hooks(
+                filter(lambda x: x is not None, batch_commit_ids))
         log.info('Post Commit Hooks complete')
 
     def get_hooks(self):
@@ -645,14 +641,10 @@ class Repository(Artifact):
         # Run Pluggable Post Commit Hooks
         if with_hooks:
             if all_commits:
-                self.run_batched_post_commit_hooks()
+                self.run_batched_post_commit_hooks.post()
             else:
                 # do individual queries to maintain order
-                new_commits = [
-                    self.commit_cls.query.get(
-                        repository_id=self._id, object_id=oid)
-                    for oid in new_commit_ids]
-                self.run_post_commit_hooks(new_commits)
+                self.run_post_commit_hooks.post(new_commit_ids)
 
         return len(commit_ids)
 
@@ -726,7 +718,15 @@ class Commit(Artifact):
             r = cls.query.get(object_id=object_id, repository_id=repository_id)
         return r, isnew
 
-    def get_path(self, path):
+    def get_path(self, path, verify=True):
+        """
+        Get the `RepositoryContent` instance at the given path.
+
+        :param verify: bool. if False, it will not verify that the file/folder
+        exists. Obviously, you should only do this if you're confident that it
+        does exist.
+
+        """
         raise NotImplementedError("get_path")
 
     def url(self):
@@ -776,28 +776,33 @@ class Commit(Artifact):
 
     @property
     def paths_added(self):
-        return set(self.diffs.added + map(itemgetter('new'), self.diffs.copied))
+        """Deprecated. This is only needed for backwards compat."""
+        return set(
+            self.diffs.added + map(itemgetter('new'), self.diffs.copied))
 
     @property
     def files_added(self):
         added_paths = set()
         added = []
-        for path in self.paths_added:
-            if path not in added_paths:
-                added_paths.add(path)
-                obj = self.get_path(path)
-                if obj.kind == 'File':
-                    added.append(obj)
+
+        def add_path(added_path):
+            if added_path not in added_paths:
+                added_paths.add(added_path)
+                added_obj = self.get_path(added_path, verify=False)
+                if added_obj.kind == 'File':
+                    added.append(added_obj)
                 else:
-                    for child in obj.find_files():
-                        if child.path not in added_paths:
-                            added_paths.add(child.path)
-                            added.append(child)
+                    for child in added_obj.find_files():
+                        add_path(child.path)
+
+        for path in self.paths_added:
+            add_path(path)
+
         return added
 
     @property
     def files_modified(self):
-        return [self.get_path(p) for p in self.diffs.changed]
+        return [self.get_path(p, verify=False) for p in self.diffs.changed]
 
     @LazyProperty
     def summary(self):
@@ -979,49 +984,3 @@ class _RepoContentJoin(ManyToOneJoin):
 
     def set(self, instance, value):
         self.prop.set_from_obj(instance, value)
-
-### END MING Relation Properties ###
-
-
-class RepoAlternate(MappedClass):
-
-    class __mongometa__:
-        name = 'repo_alternate'
-        session = repository_orm_session
-        unique_indexes = [(
-            'file_spec.path',
-            'file_spec.app_config_id',
-            'file_spec.version_id'
-        )]
-        indexes = ['content_hash']
-
-    _id = FieldProperty(S.ObjectId)
-    file_spec = RepoVersionSpec()
-    file = RepoContentRelation(via="file_spec")
-    resources = FieldProperty({str: None})
-    loading = FieldProperty(bool, if_missing=False)
-    content_hash = FieldProperty(str)
-
-    @classmethod
-    def get_by_file(cls, file, **kw):
-        query = {
-            'file_spec.path': file.path,
-            'file_spec.app_config_id': file.repo.app_config_id,
-            'file_spec.version_id': file.version_id
-        }
-        query.update(kw)
-        return cls.query.get(**query)
-
-    @classmethod
-    def upsert(cls, file):
-        alt = cls.get_by_file(file)
-        if not alt:
-            alt = cls()
-            alt.file = file
-            session(cls).flush(alt)
-        return alt
-
-    def get_alt_url(self, key=None):
-        if key and key in self.resources:
-            return self.resources[key]
-        return self.resources.get('*')

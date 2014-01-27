@@ -3,9 +3,6 @@
 
 {% do g.resource_manager.register_css('visualize/vf_visualizer_embedder.scss') %}
 
-{% do g.resource_manager.register_js('visualize/visualizer.js') %}
-{% do g.resource_manager.register_js('visualize/VFVisualizerEmbedder.js') %}
-
 {% block title %}
   {{c.project.name}} / {{c.app.config.options.mount_label}} /
   {{c.commit.shorthand_id()}}
@@ -14,9 +11,8 @@
 
 {% block header %}
     <a class="path_part repo-ci-link" href="{{c.commit.url()}}">{{c.commit.shorthand_id()}}</a>:
-        {% set path_parts = c.file.path.split('/')[1:-1] %}
-        {% for part in path_parts %}
-        <a class="path_part" href="{{c.app.url + 'folder/' + rev + '/' + '/'.join(path_parts[:loop.index]) }}">{{part}}</a> /
+        {% for crumb in bread_crumbs %}
+        <a class="path_part" href="{{ crumb.url }}">{{ crumb.name }}/</a>
         {% endfor %}
     <span class="path_part">{{h.really_unicode(c.file.name)}}</span>
 {% endblock %}
@@ -43,6 +39,6 @@
           </div>
       {% endif %}
   {% endblock %}
-  {{c.visualizer_widget.display(value=c.file, context="repo", force=force_display, extra_params=extra_params)}}
+  <div class="repoVisualizerContainer">{{ rendered_file }}</div>
   {{c.thread.display(value=thread, title="Discussion", new_post_text="New Comment")}}
 {% endblock %}
