@@ -502,7 +502,7 @@ class Repository(Artifact):
             for oid in commit_ids]
         for hook, args, kwargs in self.get_hooks():
             log.info('Running Postcommit hook %s on %d commits' % (
-                hook.name, len(commits)))
+                hook.shortname, len(commits)))
             hook.run(commits, args=args, kwargs=kwargs)
             log.info('Hook complete')
 
