@@ -221,7 +221,7 @@ class SVNRepository(Repository):
 
     @LazyProperty
     def svn_url(self):
-        return u'file://%s/%s' % (self.fs_path, self.name)
+        return u'file://%s' % (os.path.join(self.fs_path, self.name))
 
     def init(self):
         fullname = self._setup_paths()
@@ -421,7 +421,7 @@ class SVNRepository(Repository):
         @return: new commit object
 
         """
-        dest_url = self.svn_url + dest + os.path.basename(path)
+        dest_url = os.path.join(self.svn_url, dest, os.path.basename(path))
         rev = self.svn.import_(path, dest_url, msg)
         if author:
             self.svn.revpropset("svn:author", author, dest_url, revision=rev)
