@@ -422,8 +422,14 @@ class SVNRepository(Repository):
 
         """
         dest_url = os.path.join(self.svn_url, dest, os.path.basename(path))
-        with self.with_default_username(author):
-            self.svn.import_(path, dest_url, msg)
+        try:
+            with self.with_default_username(author):
+                self.svn.import_(path, dest_url, msg)
+        except pysvn.ClientError as e:
+            if 'File already exists' in e.message:
+                raise FileExists(dest)
+            else:
+                raise
         self.refresh()
 
     def add_folder(self, dest, msg='', author=None, make_parents=True):
