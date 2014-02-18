@@ -422,20 +422,15 @@ class SVNRepository(Repository):
 
         """
         dest_url = os.path.join(self.svn_url, dest, os.path.basename(path))
-        rev = self.svn.import_(path, dest_url, msg)
-        if author:
-            self.svn.revpropset("svn:author", author, dest_url, revision=rev)
+        with self.with_default_username(author):
+            self.svn.import_(path, dest_url, msg)
         self.refresh()
 
     def add_folder(self, dest, msg='', author=None, make_parents=True):
         dest_url = self.svn_url + dest
-        cmd = lambda: self.svn.mkdir(dest_url, msg, make_parents)
         try:
-            if author:
-                with self.with_default_username(author):
-                    cmd()
-            else:
-                cmd()
+            with self.with_default_username(author):
+                self.svn.mkdir(dest_url, msg, make_parents)
         except pysvn.ClientError as e:
             if 'File already exists' in e.message:
                 raise FileExists(dest)
@@ -444,7 +439,8 @@ class SVNRepository(Repository):
 
     @contextmanager
     def with_default_username(self, username):
-        self.svn.set_default_username(username)
+        if username:
+            self.svn.set_default_username(username)
         try:
             yield
         finally:
