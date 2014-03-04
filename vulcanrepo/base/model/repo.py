@@ -131,6 +131,7 @@ class RepositoryContent(ArtifactApiMixin):
 class RepositoryFile(RepositoryContent, VisualizableMixIn):
     """Facade for interacting with a repository file"""
     kind = 'File'
+    visualizable_kind = 'repository_file'
     type_s = 'Blob'
     link_type = 'file'
     folder_cls = None
