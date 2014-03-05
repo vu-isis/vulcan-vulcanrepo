@@ -162,7 +162,7 @@ class SVNCommit(Commit):
         for path in self.diffs.removed:
             if path not in removed_paths:
                 removed_paths.add(path)
-                obj = self.parent.get_path(path)
+                obj = self.parent.get_path(path, verify=False)
                 if obj.kind == 'File':
                     removed.append(obj)
                 else:
