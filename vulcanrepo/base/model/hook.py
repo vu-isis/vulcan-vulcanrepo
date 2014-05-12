@@ -132,7 +132,7 @@ class Plugin(object):
         modded_paths = []
         for path in commit.paths_added.union(commit.diffs.changed):
             if path.endswith('/'):
-                repo_dir = commit.get_path(path)
+                repo_dir = commit.get_path(path, False)
                 for child in repo_dir.find_files():
                     if child.path not in modded_paths:
                         modded_paths.append(child.path)
