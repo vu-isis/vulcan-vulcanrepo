@@ -12,6 +12,14 @@ class ForgeProjectFile(RepoDerivedObject):
     These are designed to work with the ForgePort tool to parse
 
     """
+    class __mongometa__:
+        name = 'forgeproject_file'
+        indexes = [
+            'app_config_id',
+            ('blob_spec.app_config_id', 'blob_spec.path',
+             'blob_spec.version_id')
+        ]
+
     name = FieldProperty(str, if_missing=None)
     creator_id = ForeignIdProperty(User, if_missing=None)
 

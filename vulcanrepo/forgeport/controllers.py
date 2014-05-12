@@ -15,17 +15,23 @@ class ForgePortRestController(BaseController):
         g.security.require_authenticated()
 
     def projects_for_app_config(self, app_config):
-        repo = app_config.app(app_config.project, app_config).repo
+        repo = app_config.instantiate().repo
+        ci = repo.latest()
 
         # find design projects
         owner_map = {}
         dp_query = {"app_config_id": app_config._id}
         for forge_project in ForgeProjectFile.query.find(dp_query):
+            parent_path = os.path.dirname(forge_project.blob_spec.path) + '/'
+            parent_dir = ci.get_path(parent_path)
+            if not parent_dir:
+                continue
+
             project_spec = {
                 "name": forge_project.display_name,
                 "svnUrl": repo.clone_url('https') + os.path.dirname(
                     forge_project.path),
-                "lastModified": int(forge_project.get_last_modified_time())
+                "lastModified": int(parent_dir.get_timestamp())
             }
             creator_id = forge_project.creator_id
             if creator_id not in owner_map:
