@@ -10,7 +10,8 @@ from vulcanforge.auth.schema import ACL, ACE, EVERYONE
 from vulcanforge.auth.model import User
 from vulcanforge.common.model.session import repository_orm_session
 from vulcanforge.common.util.filesystem import import_object
-from vulcanforge.visualize.model import VisualizerConfig
+from vulcanforge.visualize.model import VisualizerConfig, \
+    VisualizableQueryParam
 from vulcanforge.visualize.s3hosted import S3HostedVisualizer
 
 from vulcanrepo.tasks import purge_hook
@@ -169,6 +170,8 @@ class VisualizerHook(CommitPlugin):
         for obj in commit.files_removed:
             for pfile in obj.find_processed_files():
                 pfile.delete()
+            VisualizableQueryParam.query.remove({
+                "unique_id": obj.get_unique_id()})
 
 
 class VisualizerManager(MultiCommitPlugin):
