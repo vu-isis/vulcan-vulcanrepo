@@ -46,7 +46,7 @@ setup(
         'vulcanforge': [
             ('**.py', 'python', None),
             ('templates/**.mako', 'mako', None),
-            ('templates/**.html', 'genshi', None),
+            ('templates/**.html', 'jinja', None),
             ('static/**', 'ignore', None)]
     },
     entry_points="""

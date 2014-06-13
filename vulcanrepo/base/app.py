@@ -98,7 +98,7 @@ class RepositoryApp(Application):
         48: 'images/code_48.png'
     }
     default_hooks = {
-        "post_commit": ['visualizer']
+        "post_commit": ['visualizer', 'forgeport']
     }
     reference_opts = dict(Application.reference_opts, can_reference=True)
     admin_description = (

@@ -140,6 +140,7 @@ class RepositoryContent(ArtifactApiMixin):
 class RepositoryFile(RepositoryContent, VisualizableMixIn):
     """Facade for interacting with a repository file"""
     kind = 'File'
+    visualizable_kind = 'repository_file'
     type_s = 'Blob'
     link_type = 'file'
     folder_cls = None
@@ -512,7 +513,7 @@ class Repository(Artifact):
             for oid in commit_ids]
         for hook, args, kwargs in self.get_hooks():
             log.info('Running Postcommit hook %s on %d commits' % (
-                hook.name, len(commits)))
+                hook.shortname, len(commits)))
             hook.run(commits, args=args, kwargs=kwargs)
             log.info('Hook complete')
 

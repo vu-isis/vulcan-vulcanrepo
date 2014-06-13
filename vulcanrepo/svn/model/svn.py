@@ -162,7 +162,7 @@ class SVNCommit(Commit):
         for path in self.diffs.removed:
             if path not in removed_paths:
                 removed_paths.add(path)
-                obj = self.parent.get_path(path)
+                obj = self.parent.get_path(path, verify=False)
                 if obj.kind == 'File':
                     removed.append(obj)
                 else:
@@ -221,7 +221,7 @@ class SVNRepository(Repository):
 
     @LazyProperty
     def svn_url(self):
-        return u'file://%s/%s' % (self.fs_path, self.name)
+        return u'file://%s' % (os.path.join(self.fs_path, self.name))
 
     def init(self):
         fullname = self._setup_paths()
@@ -421,21 +421,22 @@ class SVNRepository(Repository):
         @return: new commit object
 
         """
-        dest_url = self.svn_url + dest + os.path.basename(path)
-        rev = self.svn.import_(path, dest_url, msg)
-        if author:
-            self.svn.revpropset("svn:author", author, dest_url, revision=rev)
+        dest_url = os.path.join(self.svn_url, dest, os.path.basename(path))
+        try:
+            with self.with_default_username(author):
+                self.svn.import_(path, dest_url, msg)
+        except pysvn.ClientError as e:
+            if 'File already exists' in e.message:
+                raise FileExists(dest)
+            else:
+                raise
         self.refresh()
 
     def add_folder(self, dest, msg='', author=None, make_parents=True):
         dest_url = self.svn_url + dest
-        cmd = lambda: self.svn.mkdir(dest_url, msg, make_parents)
         try:
-            if author:
-                with self.with_default_username(author):
-                    cmd()
-            else:
-                cmd()
+            with self.with_default_username(author):
+                self.svn.mkdir(dest_url, msg, make_parents)
         except pysvn.ClientError as e:
             if 'File already exists' in e.message:
                 raise FileExists(dest)
@@ -444,7 +445,8 @@ class SVNRepository(Repository):
 
     @contextmanager
     def with_default_username(self, username):
-        self.svn.set_default_username(username)
+        if username:
+            self.svn.set_default_username(username)
         try:
             yield
         finally:

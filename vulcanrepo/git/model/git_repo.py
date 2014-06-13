@@ -180,7 +180,7 @@ class GitRepository(Repository):
     repo_id = 'git'
     type_s = 'Git Repository'
     url_map = {
-        'ro': 'git://{host}{path}',
+        'ro': 'http://{host}{path}',
         'rw': 'ssh://{username}@{host}{path}',
         'https': 'https://{username}@{host}{path}',
         'https_anon': 'https://{host}{path}'
