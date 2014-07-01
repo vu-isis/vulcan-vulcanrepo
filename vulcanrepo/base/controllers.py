@@ -554,7 +554,7 @@ class ModifyController(object):
 
         # get component
         artifact_ref = urllib.unquote(artifact_ref)
-        artifact = ArtifactReference.artifact_by_index_id(artifact_ref)
+        artifact = g.artifact.get_artifact_by_index_id(artifact_ref)
         if not artifact:
             raise exc.HTTPNotFound
 
