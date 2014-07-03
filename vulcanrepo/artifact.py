@@ -9,7 +9,6 @@ from vulcanforge.project.model import Project
 
 LOG = logging.getLogger(__name__)
 
-# Ephemeral Functions for ArtifactReference and Shortlink IDs
 REPO_INDEX_ID_RE = re.compile(r'^Repo\.')
 
 
@@ -23,7 +22,6 @@ def repo_get_by_index_id(index_id, match=None):
                 artifact = ci.get_path(path)
     except Exception:
         LOG.warn('Error looking up repo? index_id {}'.format(index_id))
-        pass
     return artifact
 
 REPO_SHORTLINK_RE = re.compile(r'^\((?P<commit>[a-z0-9]+)\)(?P<path>/.*)')
