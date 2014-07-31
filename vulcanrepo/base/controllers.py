@@ -277,12 +277,9 @@ class BaseRepositoryController(BaseController):
         if readme_file:
             text = readme_file.open().read()
             if text:
-                renderer = g.pypeline_markup.renderer(readme_file.name)
-                if renderer[1]:
-                    text = g.pypeline_markup.render(readme_file.name, text)
                 result = {
                     'name': readme_file.name,
-                    'text': text
+                    'text': g.markdown.convert(text)
                 }
         return result
 
