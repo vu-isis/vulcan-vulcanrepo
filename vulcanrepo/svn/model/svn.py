@@ -209,7 +209,7 @@ class SVNRepository(Repository):
     type_s = 'SVN Repository'
     MAX_MEM_READ = 50 * 10 ** 6
     url_map = {
-        'ro': 'http://{domain}{path}',
+        'ro': 'http://{host}{path}',
         'rw': 'svn+ssh://{username}@{domain}{path}',
         'https': 'https://{username}@{host}{path}',
         'https_anon': 'https://{host}{path}'
