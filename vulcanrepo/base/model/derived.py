@@ -37,11 +37,9 @@ BLOB_URL_RE = re.compile(r'''
 
 
 class RepoDerivedObject(BaseMappedClass):
-    """Abstract class for objects that point to a repository file
-
-    It's creation was motivated by the desire to persist a representation
-    of a design project, derived from a .avmproject file, and a design, derived
-    from a ddp/dmd file.
+    """Abstract class for objects that point to a repository file. Enables
+    parsing and persistence of information based on files committed to the
+    repository. Typically managed by a post commit hook.
 
     """
 
@@ -88,14 +86,10 @@ class RepoDerivedObject(BaseMappedClass):
             'version': self.version
         }
 
-    @LazyProperty
-    def neighborhood(self):
-        return Neighborhood.query.get(_id=self.neighborhood_id)
-
     @classmethod
     def get_from_blob(cls, blob, **kw):
         """
-        Queries for a design object, given a repo file.
+        Gets a object, given a repo file.
 
         Note that this cannot use the commit object_id, because each
         derived object can represent a file across multiple commits
@@ -109,58 +103,10 @@ class RepoDerivedObject(BaseMappedClass):
         query.update(kw)
         return cls.query.find(query).first()
 
-    def get_blob_url(self):
-        # quick and dirty
-        if self.app_config:
-            return self.app_config.url() + \
-                   'file/' + \
-                   self.blob_spec.rev.split(':')[-1] + \
-                   self.blob_spec.path
-
-    @property
-    def display_name(self):
-        return self.path
-
-    def shorthand_id(self):
-        return '{path}_{_id}'.format(path=self.path, _id=self._id)
-
-    @property
-    def app_config(self):
-        return AppConfig.query.get(_id=self.app_config_id)
-
-    @property
-    def project(self):
-        return Project.query.get(_id=self.project_id)
-
-    @property
-    def authors(self):
-        return User.query.find({'_id': {"$in": self.author_ids}})
-
-    @LazyProperty
-    def repo(self):
-        try:
-            with g.context_manager.push(app_config_id=self.app_config_id):
-                return c.app.repo
-        except NoSuchAppError:
-            return None
-
-    def get_blob(self):
-        """This method is only needed for backwards compatibility"""
-        return self.blob
-
-    def get_blob_at_rev(self, rev):
-        if self.repo:
-            ci = self.repo.commit(rev)
-            if ci:
-                return ci.get_path(self.blob_spec.path)
-
-    @property
-    def path(self):
-        return self.blob_spec.path
-
     @classmethod
     def get_accessible(cls, query=None, project=None, permission='read',
                        user=None):
+        """Query accessible objects"""
         if project is None:
             project = c.project
         if user is None:
@@ -181,6 +127,7 @@ class RepoDerivedObject(BaseMappedClass):
 
     @classmethod
     def get_from_blob_url(cls, url):
+        """Query for an object based on repository file url"""
         match = BLOB_URL_RE.match(url)
         if not match:
             return None
@@ -229,7 +176,70 @@ class RepoDerivedObject(BaseMappedClass):
 
         return new
 
+    @LazyProperty
+    def neighborhood(self):
+        return Neighborhood.query.get(_id=self.neighborhood_id)
+
+    @property
+    def app_config(self):
+        return AppConfig.query.get(_id=self.app_config_id)
+
+    @property
+    def project(self):
+        return Project.query.get(_id=self.project_id)
+
+    @property
+    def authors(self):
+        """Returns User objects of commit authors, if found"""
+        return User.query.find({'_id': {"$in": self.author_ids}})
+
+    @LazyProperty
+    def repo(self):
+        """Get the repository instance"""
+        try:
+            with g.context_manager.push(app_config_id=self.app_config_id):
+                return c.app.repo
+        except NoSuchAppError:
+            return None
+
+    @property
+    def display_name(self):
+        return self.path
+
+    @property
+    def path(self):
+        return self.blob_spec.path
+
+    def shorthand_id(self):
+        """For markdown embeds and displaying artifact links"""
+        return '{path}_{_id}'.format(path=self.path, _id=self._id)
+
+    def get_blob_url(self):
+        """Get url for underlying repository file. Faster than calling
+        self.blob.url() because it makes no calls to the underlying repository
+
+        """
+        if self.app_config:
+            return self.app_config.url() + \
+                   'file/' + \
+                   self.blob_spec.rev.split(':')[-1] + \
+                   self.blob_spec.path
+
+    def get_blob_at_rev(self, rev):
+        """Get the underlying file at a specified revision, providing the file
+        has not changed paths.
+
+        rev should be a string or int identifying the revision, as appropriate
+        for the Repository.commit method.
+
+        """
+        if self.repo:
+            ci = self.repo.commit(rev)
+            if ci:
+                return ci.get_path(self.blob_spec.path)
+
     def increment_from_blob(self, blob, **kw):
+        """Increment the version and point to the new file"""
         kw.setdefault('mod_date', self.blob.commit.committed.date)
         for k, v in kw.items():
             setattr(self, k, v)
@@ -238,6 +248,10 @@ class RepoDerivedObject(BaseMappedClass):
         return self
 
     def render(self, shortname=None, **kw):
+        """Find a visualizer associated with the underlying file and invoke it
+        on the file.
+
+        """
         content = None
         with g.context_manager.push(app_config_id=self.app_config_id):
             if self.blob:
@@ -247,6 +261,7 @@ class RepoDerivedObject(BaseMappedClass):
         return content
 
     def post_process(self):
+        """Hook for post processing. Called from `from_blob` method."""
         pass
 
     def users(self):
@@ -260,6 +275,7 @@ class RepoDerivedObject(BaseMappedClass):
         return users
 
     def get_json_content(self, strict=False):
+        """Load repository file content as json"""
         loader = strict_load if strict else json.load
         return loader(self.blob.open())
 

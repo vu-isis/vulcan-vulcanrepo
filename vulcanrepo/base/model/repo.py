@@ -50,7 +50,12 @@ README_RE = re.compile('^README(\.[^.]*)?$', re.IGNORECASE)
 
 
 class RepositoryThread(Thread):
-    """The ref_id property is simply a path for this guy"""
+    """
+    Discussion thread for repository files and folders.
+
+    Note that the ref_id property is simply a path for this guy
+
+    """
 
     class __mongometa__:
         polymorphic_identity = 'repo_thread'
@@ -62,31 +67,34 @@ class RepositoryThread(Thread):
 
 
 class RepositoryContent(ArtifactApiMixin):
-    kind = None
-    type_s = None
+    """Base class for repository files and folders. Contains properties and
+    methods common to each.
+
+    Repository content information is only persisted within the repository
+    itself. This object and its subclasses provide a unified interface for
+    interacting with the underlying files and folders.
+
+    """
+    kind = None  # File, Folder
+    type_s = None  # For indexing, if necessary
     acl = []
 
     def __init__(self, commit, path):
+        """
+        :param commit Commit
+        :param path str
+
+        """
         self.commit = commit
         self.path = path
 
-    def __eq__(self, other):
-        if other.__class__ == self.__class__:
-            return (self.path == other.path and
-                    self.commit.object_id == other.commit.object_id)
-        return False
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
     @property
     def repo(self):
+        """Get the associated Repository object"""
         return self.commit.repo
 
-    def url_for_rev(self, rev):
-        raise NotImplementedError('url_for_rev')
-
     def ls_entry(self, escape=False):
+        """Metadata about this content object"""
         name = h.really_unicode(self.name)
         path = self.path
         if escape:
@@ -113,13 +121,11 @@ class RepositoryContent(ArtifactApiMixin):
         return self.repo.app_config
 
     def url(self):
+        """Url of the object within the forge"""
         pass
 
-    def url_for_method(self, method):
-        return self.commit.url_for_method(method) + h.urlquote(self.path)
-
     def link_text_short(self):
-        return self.name if self.name else u'/'
+        return self.name if self.name else '/'
 
     def shorthand_id(self):
         return u'({}){}'.format(self.commit.shorthand_id(), self.path)
@@ -130,11 +136,22 @@ class RepositoryContent(ArtifactApiMixin):
 
     @property
     def cache_name(self):
-        return u'.'.join((
+        return '.'.join((
             str(self.app_config_id),
             self.version_id,  # mixins should apply this (do not add here)
-            self.path.encode('utf8')
+            self.path
         ))
+
+    def url_for_rev(self, rev):
+        """Get the url of the object at the same path with specified revision
+        string
+
+        """
+        raise NotImplementedError('url_for_rev')
+
+    def url_for_method(self, method):
+        """Url for a given controller method. Primarly used internally."""
+        return self.commit.url_for_method(method) + h.urlquote(self.path)
 
 
 class RepositoryFile(RepositoryContent, VisualizableMixIn):
@@ -145,27 +162,50 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
     link_type = 'file'
     folder_cls = None
 
-    def url_for_rev(self, rev):
-        return self.repo.url() + 'file/' + rev + h.urlquote(self.path)
+    @classmethod
+    def find_for_task(cls, commit_cls_path, commit_id, path):
+        """Used in conjunction with `get_task_lookup_args` to allow for the
+        retrieval of RepositoryFile instances when performing asynchronous
+        tasks.
 
-    def url(self):
-        return self.url_for_method('file')
-
-    def raw_url(self):
-        return self.url() + '?format=raw'
+        """
+        commit_cls = import_object(commit_cls_path)
+        ci = commit_cls.query.get(_id=commit_id)
+        return ci.get_path(path)
 
     @property
     def name(self):
+        """Returns the filename"""
         return os.path.basename(self.path)
 
     @property
     def size(self):
+        """Size of the file, in bytes"""
         raise NotImplementedError('size')
 
+    @LazyProperty
+    def parent(self):
+        """Get the containing folder"""
+        parent_path = os.path.dirname(self.path)
+        return self.folder_cls(self.commit, parent_path)
+
+    def url(self):
+        """Url to visualize the file in the forge, if possible"""
+        return self.url_for_method('file')
+
+    def url_for_rev(self, rev):
+        return self.repo.url() + 'file/' + rev + h.urlquote(self.path)
+
+    def raw_url(self):
+        """Url to download the file"""
+        return self.url() + '?format=raw'
+
     def open(self):
+        """Open as a file pointer"""
         raise NotImplementedError('open')
 
     def read(self):
+        """Get raw content as a string"""
         raise NotImplementedError('read')
 
     def ls_entry(self, escape=False):
@@ -176,18 +216,15 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
         })
         return entry
 
-    @LazyProperty
-    def parent(self):
-        parent_path = os.path.dirname(self.path)
-        return self.folder_cls(self.commit, parent_path)
-
     def get_content_hash(self):
+        """Return a hash of the content. Files with identical content should
+        have identical hashes.
+
+        """
         raise NotImplementedError('get_content_hash')
 
     def get_discussion_thread(self, data=None, generate_if_missing=True):
-        t = RepositoryThread.query.get(
-            ref_id=self.path,
-            discussion_id=self.app_config.discussion_id)
+        t = RepositoryThread.query.get(ref_id=self.path)
         if t is None and generate_if_missing:
             t = RepositoryThread(
                 discussion_id=self.app_config.discussion_id,
@@ -197,6 +234,7 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
         return t
 
     def get_content_to_folder(self, path, **kw):
+        """Download the content to a local folder at :path"""
         full_path = os.path.join(path, self.name)
         with open(full_path, 'w') as fp:
             src = self.open()
@@ -205,19 +243,26 @@ class RepositoryFile(RepositoryContent, VisualizableMixIn):
         return self.name
 
     def get_unique_id(self):
+        """Unique identifier of this version of this file.
+
+        This should be the same for a given file across multiple commits, so
+        long as the file is not modified in any of the commits, and different
+        across commits in which the file was modified.
+
+        """
         return 'RepoVersion' + '.'.join(
             (str(self.app_config_id), self.path, self.version_id))
 
     def artifact_ref_id(self):
+        """Used for the visualizer infrastructure"""
         return self.index_id()
 
-    @classmethod
-    def find_for_task(cls, commit_cls_path, commit_id, path):
-        commit_cls = import_object(commit_cls_path)
-        ci = commit_cls.query.get(_id=commit_id)
-        return ci.get_path(path)
-
     def get_task_lookup_args(self):
+        """Used in conjunction with `find_for_task` to allow for the
+        retrieval of RepositoryFile instances when performing asynchronous
+        tasks.
+
+        """
         commit_cls_path = '{}:{}'.format(self.commit.__class__.__module__,
                                          self.commit.__class__.__name__)
         return [commit_cls_path, self.commit._id, self.path]
@@ -234,6 +279,13 @@ class RepositoryFolder(RepositoryContent):
         self.name = path.rsplit('/', 2)[-2]
         super(RepositoryFolder, self).__init__(commit, path)
 
+    @LazyProperty
+    def parent(self):
+        """Get the parent folder of this folder, if any"""
+        if self.path != '/':
+            parent_path = os.path.normpath(os.path.join(self.path, os.pardir))
+            return self.__class__(self.commit, parent_path)
+
     def url_for_rev(self, rev):
         return self.repo.url() + 'folder/' + rev + self.path
 
@@ -241,12 +293,24 @@ class RepositoryFolder(RepositoryContent):
         return self.url_for_method('folder')
 
     def __getitem__(self, item):
+        """Retrieve relative path"""
         return self.commit.get_path(self.path + item)
 
     def __iter__(self):
+        """Implement in subclass. Should iterate through all files and folders
+        contained in this folder. Does not descend into subfolders.
+
+        """
         raise NotImplementedError('__iter__')
 
     def walk(self, ignore=[]):
+        """Generator that yields files and folders in this folder or any
+        subfolder.
+
+        If :param ignore is provided, files or folders of this name are not
+        returned.
+
+        """
         folders = [self]
         while folders:
             _new_folders = []
@@ -258,6 +322,10 @@ class RepositoryFolder(RepositoryContent):
             folders = _new_folders
 
     def find_files(self):
+        """Generator that yields all RepositoryFiles in this folder or any
+        subfolder.
+
+        """
         for obj in self.walk():
             if obj.kind == 'File':
                 yield obj
@@ -267,16 +335,22 @@ class RepositoryFolder(RepositoryContent):
         return [obj.ls_entry(escape=escape) for obj in objs]
 
     def get_from_path(self, path):
+        """Get file or folder using relative path. OS-style """
         full_path = os.path.normpath(os.path.join(self.path, path))
         return self.commit.get_path(full_path)
 
     def readme(self):
+        """Find a readme in this folder. If none found, returns None."""
         for obj in self:
             if obj.kind == 'File' and README_RE.match(obj.name):
                 return obj
         return None
 
     def get_content_to_folder(self, path, ignore=[], contents_only=False):
+        """Download this folder and all of its contents to a local filesystem
+        folder
+
+        """
         if not contents_only and self.name:
             path = os.path.join(path, self.name)
         if not os.path.exists(path):
@@ -286,14 +360,9 @@ class RepositoryFolder(RepositoryContent):
                 obj.get_content_to_folder(path, ignore=ignore)
         return self.name
 
-    @LazyProperty
-    def parent(self):
-        if self.path != '/':
-            parent_path = os.path.normpath(os.path.join(self.path, os.pardir))
-            return self.__class__(self.commit, parent_path)
-
 
 class Repository(Artifact):
+    """Database Representation of a Repository"""
     BATCH_SIZE = 100
     post_receive_template = string.Template('#!/bin/bash\ncurl -s -k $url\n')
     commit_cls = None
@@ -326,6 +395,9 @@ class Repository(Artifact):
                 kw['url_path'] = self.default_url_path(c.project, kw['tool'])
         super(Repository, self).__init__(**kw)
 
+    def __repr__(self):
+        return '<%s %s>' % (self.__class__.__name__, self.full_fs_path)
+
     @classmethod
     def default_fs_path(cls, project, tool):
         repos_root = tg.config.get('scm.repos.root', '/')
@@ -347,8 +419,29 @@ class Repository(Artifact):
             tg.config.get('scm.fs_prefix', 'projects'), dirname)
         return '/' + path + '/'
 
-    def __repr__(self):
-        return '<%s %s>' % (self.__class__.__name__, self.full_fs_path)
+    @property
+    def url_name(self):
+        return self.name
+
+    @property
+    def full_fs_path(self):
+        """Path to the repository on the filesystem"""
+        return os.path.join(self.fs_path, self.name)
+
+    @property
+    def email_address(self):
+        """Used in notifications"""
+        domain = '.'.join(
+            reversed(self.app.url[1:-1].split('/'))).replace('_', '-')
+        return 'noreply@%s%s' % (domain, config.common_suffix)
+
+    @property
+    def url_map(self):
+        """Dictionary with keys ro, rw, https, https_anon specifying source
+        urls for checkout purposes
+
+        """
+        raise NotImplementedError('url_map')
 
     def _setup_paths(self, create_repo_dir=True):
         """Upsert the path to the repository"""
@@ -356,7 +449,7 @@ class Repository(Artifact):
         path = fullname if create_repo_dir else self.fs_path
         try:
             os.makedirs(path)
-        except OSError, e:
+        except OSError as e:
             if e.errno != errno.EEXIST:  # pragma no cover
                 raise
             else:
@@ -365,32 +458,48 @@ class Repository(Artifact):
 
     def _setup_hooks(self):  # pragma no cover
         """Install a hook in the repository that will ping the refresh url for
-        the repo"""
+        the repo.
+
+        Implement in subclass.
+
+        """
         pass
 
-    @property
-    def url_name(self):
-        return self.name
-
     def init_as_clone(self, source_name, source_url):
+        """Initialize as clone of another repository"""
         self.upstream_repo.name = source_name
         self.upstream_repo.url = source_url
         session(self.__class__).flush(self)
         self.clone_from(source_url)
 
     def clone_from(self, source_url):
+        """Clone from a given source repository. Implement in subclass"""
         raise NotImplementedError('clone_from')
 
     def refresh_heads(self):
+        """Store metadata about current state of the repo, including latest
+        commit.
+
+        """
         raise NotImplementedError('refresh_heads')
 
     def refresh_commit(self, ci):
+        """Store author, log, etc on commit object by analyzing underlying
+        repository representation.
+
+        """
         raise NotImplementedError('refresh_commit')
 
     def new_commits(self, all_commits=False):
+        """Find any new commit ids that have not been analyzed by the forge. If
+        all_commits is True, return all commit ids.
+
+        :param all_commits bool
+        """
         raise NotImplementedError('new_commits')
 
     def commit(self, rev=None):
+        """Get a commit by revision string|int."""
         raise NotImplementedError('commit')
 
     def url(self):
@@ -398,12 +507,6 @@ class Repository(Artifact):
 
     def shorthand_id(self):
         return self.name
-
-    @property
-    def email_address(self):
-        domain = '.'.join(
-            reversed(self.app.url[1:-1].split('/'))).replace('_', '-')
-        return 'noreply@%s%s' % (domain, config.common_suffix)
 
     def index(self, **kw):
         return super(Repository, self).index(
@@ -414,24 +517,13 @@ class Repository(Artifact):
             **kw
         )
 
-    @property
-    def full_fs_path(self):
-        return os.path.join(self.fs_path, self.name)
-
     def suggested_clone_dest_path(self):
+        """Suggested mount point for new repository"""
         if c.project.shortname == '--init--':
             prefix = c.project.neighborhood.url_prefix.strip('/')
         else:
             prefix = c.project.shortname.replace('/', '-')
         return '{}-{}'.format(prefix, self.url_name)
-
-    @property
-    def url_map(self):
-        """Dictionary with keys ro, rw, https, https_anon specifying source
-        urls for checkout purposes
-
-        """
-        raise NotImplementedError('url_map')
 
     def clone_url(self, category, username=''):
         """
@@ -449,7 +541,8 @@ class Repository(Artifact):
         }
         domain = tg.config.get(
             'scm.domain.{}'.format(self.repo_id),
-            tg.config.get('scm.domain', 'localhost'))
+            tg.config.get('scm.domain', 'localhost')
+        )
         port_defaults = {
             'http': "80",
             'ssh': "22",
@@ -458,10 +551,10 @@ class Repository(Artifact):
         scheme = scheme_map[category]
         port = tg.config.get(
             'scm.port.{}.{}'.format(scheme, self.repo_id),
-            tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme]))
-        port_str = ':{}'.format(port) if port != port_defaults[scheme] else ''
+            tg.config.get('scm.port.{}'.format(scheme), port_defaults[scheme])
+        )
         return self.url_map[category].format(
-            host=domain + port_str,
+            host='{}'.format(domain, port),
             domain=domain,
             port=port,
             path=self.url_path + self.url_name,
@@ -478,6 +571,12 @@ class Repository(Artifact):
         raise NotImplementedError('clone_command')
 
     def upsert_post_commit_hook(self, pch, args=None, kwargs=None):
+        """Install the given PostCommitHook instance to this repository.
+
+        If args and/or kwargs are specified, the object the hook refers to
+        will be instantiated with the given args/kwargs.
+
+        """
         if args is None:
             args = []
         if kwargs is None:
@@ -486,11 +585,17 @@ class Repository(Artifact):
             if p.plugin_id == pch._id:
                 p.update({"args": args, "kwargs": kwargs})
                 return False
-        self.post_commit_hooks.append(dict(
-            plugin_id=pch._id, args=args, kwargs=kwargs))
+        self.post_commit_hooks.append({
+            'plugin_id': pch._id,
+            'args': args,
+            'kwargs': kwargs})
         return True
 
     def remove_post_commit_hook(self, plugin_id):
+        """
+        Uninstall the post commit hook with the given id from this repository
+
+        """
         for i, p in enumerate(self.post_commit_hooks):
             if p.plugin_id == plugin_id:
                 break
@@ -504,7 +609,7 @@ class Repository(Artifact):
         """
         Run post commit hooks on a sequence of commits
 
-        @param commits: sequence of Commit objects
+        @param commit_ids: sequence of Commit object ids
         @return: None
 
         """
@@ -549,6 +654,7 @@ class Repository(Artifact):
                 log.warn("No Postcommit hook found with id %s" % pch.plugin_id)
 
     def post_commit_feed(self, ci):
+        """Store a feed instance for this commit"""
         return Feed.post(
             self,
             title='New commit',
@@ -559,6 +665,10 @@ class Repository(Artifact):
         )
 
     def notify_commits(self, commit_msgs, last_commit=None):
+        """Create notification(s) for this repository given a list of commit
+        messages.
+
+        """
         if len(commit_msgs) > 1:
             subject = '%d new commits to %s %s' % (
                 len(commit_msgs),
@@ -575,26 +685,29 @@ class Repository(Artifact):
                 self.app.project.name,
             )
         text = '\n\n'.join(commit_msgs)
+        # pass last committer to notification as user
+        author = last_commit.user if last_commit else None
         notification = Notification.post(
             artifact=self,
             topic='metadata',
             subject=subject,
-            text=text)
+            text=text,
+            author=author
+        )
         return notification
 
     def refresh(self, all_commits=False, notify=True, with_hooks=True,
                 update_status=True):
         """Find any new commits in the repository and update"""
-        # updates repo head(s) attribute
-        self.refresh_heads()
+        self.refresh_heads()  # updates repository metadata
         if update_status:
             self.status = 'analyzing'
             session(self.__class__).flush()
 
-        sess = session(self.commit_cls)
         commit_ids = self.new_commits(all_commits)
         log.info('Refreshing %d new commits in %s', len(commit_ids), self)
 
+        sess = session(self.commit_cls)
         commit_msgs = []
         ref_ids = []
         new_commit_ids = []
@@ -608,6 +721,7 @@ class Repository(Artifact):
                 sess.expunge(ci)
                 continue
 
+            # refresh and create metadata
             ci.set_context(self)
             self.refresh_commit(ci)
             ArtifactReference.from_artifact(ci)
@@ -615,22 +729,26 @@ class Repository(Artifact):
             ref_ids.append(ci.index_id())
             lc = ci
 
+            # periodic flushing for large commit collections
             if (i + 1) % self.BATCH_SIZE == 0:
                 sess.flush()
                 sess.clear()
 
+            # Collect Notifications
             if notify:
                 self.post_commit_feed(ci)
                 commit_msgs.append(ci.notification_message)
 
             new_commit_ids.append(oid)
 
+        # Send Notifications
         if notify and commit_msgs:
             self.notify_commits(commit_msgs, last_commit=lc)
 
         sess.flush()
         sess.clear()
 
+        # Index the commits
         if ref_ids:
             add_artifacts(ref_ids, update_solr=False)
 
@@ -650,6 +768,7 @@ class Repository(Artifact):
         return len(commit_ids)
 
     def push_upstream_context(self):
+        """Enter context of upstream repository"""
         project, rest = Project.by_url_path(self.upstream_repo.url)
         with g.context_manager.push(project._id):
             app = project.app_instance(rest[0])
@@ -657,6 +776,9 @@ class Repository(Artifact):
 
 
 class Commit(Artifact):
+    """
+    Metadata about a commit persisted for ease of search and retrieval.
+    """
 
     class __mongometa__:
         session = repository_orm_session
@@ -687,19 +809,6 @@ class Commit(Artifact):
     def __repr__(self):
         return '<%s %s>' % (self.__class__.__name__, self.object_id)
 
-    @LazyProperty
-    def repo(self):
-        raise NotImplementedError('repo property')
-
-    @property
-    def app_config(self):
-        return self.repo.app_config
-
-    @LazyProperty
-    def user(self):
-        if self.authored.email:
-            return User.by_email_address(self.authored.email)
-
     @classmethod
     def new_by_object_id(cls, object_id, repository_id):
         return cls(object_id=object_id, repository_id=repository_id)
@@ -719,46 +828,22 @@ class Commit(Artifact):
             r = cls.query.get(object_id=object_id, repository_id=repository_id)
         return r, isnew
 
-    def get_path(self, path, verify=True):
-        """
-        Get the `RepositoryContent` instance at the given path.
+    @LazyProperty
+    def repo(self):
+        raise NotImplementedError('repo property')
 
-        :param verify: bool. if False, it will not verify that the file/folder
-        exists. Obviously, you should only do this if you're confident that it
-        does exist.
+    @property
+    def app_config(self):
+        return self.repo.app_config
 
-        """
-        raise NotImplementedError("get_path")
-
-    def url(self):
-        return self.url_for_method('commit')
-
-    def url_for_method(self, method):
-        return self.repo.url() + method + '/' + self.url_rev
+    @LazyProperty
+    def user(self):
+        if self.authored.email:
+            return User.by_email_address(self.authored.email)
 
     @property
     def url_rev(self):
         return self.object_id
-
-    def index(self, **kwargs):  # pragma no cover
-        return None
-
-    def index_id(self):
-        return '%s/%s#%s/%s' % (
-            self.__class__.__module__.replace('.', '/'),
-            self.__class__.__name__,
-            str(self.repo._id),
-            self.object_id
-        )
-
-    def get_link_content(self):
-        return self.message
-
-    def ref_category(self):
-        return u"Commits"
-
-    def set_context(self, repo):
-        self.repo = repo
 
     @property
     def committed(self):
@@ -783,6 +868,9 @@ class Commit(Artifact):
 
     @property
     def files_added(self):
+        """Returns RepositoryFile instances for all files added in this commit
+
+        """
         added_paths = set()
         added = []
 
@@ -803,22 +891,65 @@ class Commit(Artifact):
 
     @property
     def files_modified(self):
+        """Returns RepositoryFile instances for all files modified in this
+        commit.
+
+        """
         return [self.get_path(p, verify=False) for p in self.diffs.changed]
 
     @LazyProperty
     def summary(self):
+        """Returns the first line of the log message truncated to 50 chars"""
         message = h.really_unicode(self.message)
         first_line = message.split('\n')[0]
         return h.truncate(first_line, 50)
 
     @property
     def notification_message(self):
-        return u'{} by {} <{}{}>'.format(
-            h.really_unicode(self.summary),
-            h.really_unicode(self.committed.name),
+        return u'<a href="{}{}" style="text-decoration: none">{}</a> by {}'.format(
             config.common_prefix,
-            self.url()
+            self.url(),
+            h.really_unicode(self.summary),
+            h.really_unicode(self.committed.name)
         )
+
+    def get_path(self, path, verify=True):
+        """
+        Get the `RepositoryContent` instance at the given path.
+
+        :param verify: bool. if False, it will not verify that the file/folder
+        exists. Obviously, you should only do this if you're confident that it
+        does exist.
+
+        """
+        raise NotImplementedError("get_path")
+
+    def url(self):
+        return self.url_for_method('commit')
+
+    def url_for_method(self, method):
+        return self.repo.url() + method + '/' + self.url_rev
+
+    def index(self, **kwargs):  # pragma no cover
+        return None
+
+    def index_id(self):
+        return '%s/%s#%s/%s' % (
+            self.__class__.__module__.replace('.', '/'),
+            self.__class__.__name__,
+            str(self.repo._id),
+            self.object_id
+        )
+
+    def get_link_content(self):
+        """Content parsed for shortlinks to determine artifact relations"""
+        return self.message
+
+    def ref_category(self):
+        return u"Commits"
+
+    def set_context(self, repo):
+        self.repo = repo
 
     def info(self):
         return {

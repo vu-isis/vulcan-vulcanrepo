@@ -12,7 +12,7 @@ from tg import expose, redirect, url, config
 from tg.decorators import with_trailing_slash, without_trailing_slash
 from vulcanforge.common.app import DefaultAdminController, Application
 from vulcanforge.common.controllers.decorators import require_post
-from vulcanforge.common.types import SitemapEntry, ConfigOption
+from vulcanforge.common.tool import SitemapEntry, ConfigOption
 from vulcanforge.common.util import push_config
 from vulcanforge.common.util.exception import exceptionless
 from vulcanforge.resources import Icon
@@ -33,6 +33,8 @@ class RepoIOError(IOError):
 
 def format_commit_hook(hook):
     """
+    Dictionary suitable for rendering a post commit hook.
+
     @param hook: vulcanrepo.base.model.hook.PostCommitHook
     @return: dict
 
@@ -51,6 +53,7 @@ def sanitize_path(path):
 
 
 class Repo_IO(object):
+    """Provides file-like access to repository files."""
 
     def __init__(self, commit):
         self.commit = commit
@@ -75,12 +78,6 @@ class Repo_IO(object):
 
 
 class RepositoryApp(Application):
-    permissions = dict(Application.permissions,
-        write='',
-        moderate='Moderate comments',
-        unmoderated_post='Add comments without moderation',
-        post='Create new topics and add comments'
-    )
     config_options = Application.config_options + [
         ConfigOption('cloned_from_project_id', ObjectId, None),
         ConfigOption('cloned_from_repo_id', ObjectId, None),
@@ -112,12 +109,6 @@ class RepositoryApp(Application):
     admin_actions = {
         "Browse repository": {"url": ""}
     }
-    default_acl = {
-        'Admin': ['admin'],
-        'Developer': ['write', 'moderate'],
-        '*authenticated': ['post', 'unmoderated_post'],
-        '*anonymous': ['read']
-    }
     tasks = {
         'uninstall': uninstall_task
     }
@@ -125,6 +116,27 @@ class RepositoryApp(Application):
     def __init__(self, project, config):
         Application.__init__(self, project, config)
         self.admin = RepoAdminController(self)
+
+    @classmethod
+    def permissions(cls):
+        perms = super(RepositoryApp, cls).permissions()
+        perms.update(dict(
+            write='',
+            moderate='Moderate comments',
+            unmoderated_post='Add comments without moderation',
+            post='Create new topics and add comments'
+        ))
+        return perms
+
+    @classmethod
+    def default_acl(cls):
+        acl = super(RepositoryApp, cls).default_acl()
+        acl.update({
+            'Developer': ['write', 'moderate'],
+            '*authenticated': ['post', 'unmoderated_post'],
+            '*anonymous': ['read']
+        })
+        return acl
 
     def main_menu(self):
         """

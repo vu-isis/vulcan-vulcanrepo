@@ -1,6 +1,6 @@
 /*global window */
 
-(function ( global ) {
+(function (global) {
     "use strict";
 
     // Import Globals
@@ -9,7 +9,6 @@
         $vf = global.$vf;
 
     // Private variables
-
     var dropAreaMessage = 'Drag-and-drop hooks here from the list below to install.',
         noAvailableHooksMessage = 'No hooks available.',
         noActiveHooksMessage = 'No active hooks.',
@@ -22,7 +21,7 @@
         runHooksOnAllCommitsAlert = 'You have chosen to run configured hooks on all commits in repository.'
             + 'that task can take a significant amount of time. ';
 
-    var CommitHookManager = $vf.CommitHookManager = function ( config ) {
+    var CommitHookManager = $vf.CommitHookManager = function (config) {
 
         var that = this,
 
@@ -259,21 +258,15 @@
             } );
         };
 
-
         if ( config ) {
             $.extend( that, config );
         }
 
-
         // init
-
         if ( that.containerE !== null ) {
-
             that.containerE.empty();
 
-
             // Display for active items
-
             activeContainer = $( '<div/>', {
                 'class': 'hooks-active-container'
             } ).appendTo( that.containerE );
@@ -301,12 +294,10 @@
             dropAreaE = $( '<div/>', {
                 'class': 'drop-area hook'
             } ).droppable( {
-
                     accept: '.hook-available',
                     activeClass: 'will-eat',
                     hoverClass: 'drop-area-active',
                     tolerance: 'touch',
-
                     drop: function ( ev, ui ) {
 
                         ui.helper.css( 'cursor', ui.helper.data( 'cursorBefore' ) );
@@ -325,18 +316,12 @@
 
                         update();
                     },
-
                     over: function ( event, ui ) {
-
                         ui.helper.data( 'cursorBefore', ui.helper.css( 'cursor' ) );
                         ui.helper.css( 'cursor', 'copy' );
-
                     },
-
                     out: function ( event, ui ) {
-
                         ui.helper.css( 'cursor', ui.helper.data( 'cursorBefore' ) );
-
                     }
 
                 } );
@@ -349,7 +334,6 @@
             activeContainer.append( dropAreaE );
 
             // Display for available items
-
             availableContainer = $( '<div/>', {
                 'class': 'hooks-available-container'
             } ).appendTo( that.containerE );
@@ -376,7 +360,6 @@
             availableContainer.append( availableContainerList );
 
             // Waitcontainer
-
             waitContainerE = $( '<div/>', {
                 'class': 'waitContainer'
             } ).hide();
@@ -387,7 +370,6 @@
 
 
             // render Available hooks
-
             if ( that.availableHooks !== null ) {
                 that.renderAvailables();
             }
@@ -400,8 +382,6 @@
             } );
 
             // Control buttons
-
-
             buttonsE = $( '<div/>', {
                 'class': 'buttons'
             } );
@@ -412,12 +392,9 @@
             if ( this.runHooksOnAllCommitsSL !== null ) {
 
                 runHooksOnAllCommitsE = $( '<button/>', {
-
                     title: runHooksOnAllCommitsCaption,
                     text: runHooksOnAllCommitsCaption,
-
                     'class': 'runHooksOnAllCommits',
-
                     click: function () {
 
                         confirmE.dialog( {
@@ -463,13 +440,11 @@
 
             if ( this.runHooksOnLastCommitSL ) {
 
-                runHooksOnLastCommitE = $( '<button/>', {
+                runHooksOnLastCommitE = $('<button/>', {
 
                     title: runHooksOnLastCommitCaption,
                     text: runHooksOnLastCommitCaption,
-
                     'class': 'runHooksOnLastCommit',
-
                     'click': function () {
 
                         $.ajax( {
@@ -491,11 +466,9 @@
 
                     }
 
-                } );
-
+                });
 
                 buttonsE.append( runHooksOnLastCommitE );
-
             }
 
             update();
@@ -503,26 +476,20 @@
 
 
         // Confirm dialog
-
         confirmE = $( '<div/>', {
-
             title: confirmTitle,
             html: '<span class="ui-icon ui-icon-alert"></span><span class="confirmMessage">'
                 + runHooksOnAllCommitsAlert + '</span>'
-
         } ).hide();
-
         $( 'body' ).append( confirmE );
 
 
         // Load if needed
-
         if ( this.autoLoad ) {
             loadAvailable();
         }
 
         // Public interface
-
         this.loadAvailable = loadAvailable;
 
     };

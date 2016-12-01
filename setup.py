@@ -8,7 +8,7 @@ except ImportError:
 
 from vulcanrepo import __version__
 
-PROJECT_DESCRIPTION='''
+PROJECT_DESCRIPTION = '''
 VulcanRepo implements the Repository Layer for VulcanForge.
 '''
 

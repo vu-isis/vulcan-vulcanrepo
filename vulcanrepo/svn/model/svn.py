@@ -353,21 +353,21 @@ class SVNRepository(Repository):
             pysvn.opt_revision_kind.number,
             ci.commit_num - 1)
         for path in log_entry.changed_paths:
-            path_str = h.really_unicode(path.path)
+            p = path.path.decode('utf8')
             rev = parent_rev if path.action == 'D' else ci.svn_revision
-            is_file = self._is_file(path_str, rev)
+            is_file = self._is_file(p, rev)
             if not is_file:
-                path_str += u'/'
+                p += u'/'
             if path.copyfrom_path:
-                from_p = h.really_unicode(path.copyfrom_path)
+                from_p = path.copyfrom_path
                 if not is_file:
                     from_p += u'/'
                 ci.diffs.copied.append({
-                    'old': from_p,
-                    'new': path_str
+                    'old': h.really_unicode(from_p),
+                    'new': h.really_unicode(p)
                 })
             else:
-                lst[path.action].append(path_str)
+                lst[path.action].append(h.really_unicode(p))
 
     def _is_file(self, path, rev=None):
         l_info = self.svn.list(

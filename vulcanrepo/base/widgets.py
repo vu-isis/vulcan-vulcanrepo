@@ -15,6 +15,7 @@ TEMPLATE_DIR = 'jinja:vulcanrepo.base:templates/widgets/'
 
 
 class SCMLogWidget(ew_core.Widget):
+    """Displays commit history"""
     template = TEMPLATE_DIR + 'log.html'
     defaults = dict(
         ew_core.Widget.defaults,
@@ -36,6 +37,7 @@ class SCMLogWidget(ew_core.Widget):
 
 
 class SCMRevisionWidget(ew_core.Widget):
+    """Used by the SCMCommitWidget to display metadata about a commit"""
     template = TEMPLATE_DIR + 'revision.html'
     defaults = dict(
         ew_core.Widget.defaults,
@@ -45,6 +47,10 @@ class SCMRevisionWidget(ew_core.Widget):
 
 
 class SCMCommitWidget(ew_core.Widget):
+    """Renders a commit. Used SCMRevisionWidget to display metadata, then
+    displays files added, modified, deleted.
+
+    """
     template = TEMPLATE_DIR + 'commit.html'
     defaults = dict(ew_core.Widget.defaults, commit=None)
     widgets = dict(revision_widget=SCMRevisionWidget())
@@ -56,6 +62,11 @@ class SCMCommitWidget(ew_core.Widget):
 
 
 class CommitAuthorWidget(ew_core.Widget):
+    """Renders a representation of a commit author. Attempts to find an
+    associated user in the forge. If found, renders his/her avatar. Otherwise,
+    displays whatever metadata representation the repo provides.
+
+    """
     avatar_widget = Avatar()
     cache_name = '{email}.avatar'
 

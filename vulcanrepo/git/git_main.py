@@ -1,4 +1,6 @@
 #-*- python -*-
+from bson import ObjectId
+import datetime
 import logging
 
 # Non-stdlib imports
@@ -6,8 +8,9 @@ from pylons import tmpl_context as c
 
 from ming.utils import LazyProperty
 from ming.odm.odmsession import ThreadLocalODMSession
-from vulcanforge.common.types import ConfigOption, SitemapEntry
+from vulcanforge.common.tool import ConfigOption, SitemapEntry
 from vulcanforge.common.util import push_config
+from vulcanforge.common.util.counts import get_info
 from vulcanforge.common.util.exception import exceptionless
 from vulcanforge.project.model import Project
 from vulcanforge.resources import Icon
@@ -162,3 +165,27 @@ class ForgeGitApp(RepositoryApp):
                     c.app.url + 'merge_requests/',
                     className='nav_child',
                     small=merge_request_count))
+
+    def artifact_counts(self, since=None):
+        db, commit_coll = GM.GitCommit.get_pymongo_db_and_collection()
+
+        new_commit_count = commit_count = commit_coll.find({
+            "app_config_id":self.config._id
+        }).count()
+        if since is not None and isinstance(since, datetime.datetime) :
+            new_commit_count = commit_coll.find({
+                "app_config_id":self.config._id,
+                "_id":{"$gt":ObjectId.from_datetime(since)}
+            }).count()
+
+        return dict(
+            new=new_commit_count,
+            all=commit_count
+        )
+
+    @classmethod
+    def artifact_counts_by_kind(cls, app_configs, app_visits, tool_name):
+        db, coll = GM.GitCommit.get_pymongo_db_and_collection()
+        size_item = None
+        return get_info(coll, app_configs, app_visits, tool_name, size_item,
+                        has_deleted=False)

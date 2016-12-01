@@ -54,7 +54,11 @@ TEMPLATE_DIR = 'jinja:vulcanrepo.base:templates/'
 
 # Methods for retrieving repo artifacts from the request
 def get_commit(rev, args, depth=10):
-    commit = c.app.repo.commit(rev)
+    try:
+        commit = c.app.repo.commit(rev)
+    except:
+        commit = None
+        
     if not commit:
         if not args or not depth:
             raise exc.HTTPNotFound()
@@ -153,11 +157,15 @@ class BaseRepositoryController(BaseController):
     @expose(TEMPLATE_DIR + 'tree.html')
     @expose('json', render_params={"sanitize": False})
     def folder(self, rev, *args, **kw):
+        """Render the contents of a given folder within the file browser"""
+
         # TODO: Folders ending in `.json` will return the JSON structure
         # instead of the HTML page when the html page is requested.
         # A rare case but a bug nonetheless.
         # see: http://turbogears.org/2.1/docs/main/Config.html#request-extensions
-        c.commit, c.folder, rev = get_commit_and_obj(rev, *args, use_ext=True)
+        rev_param = request.url.split('folder/')[1].split('/')[0]
+
+        c.commit, c.folder, rev = get_commit_and_obj(rev_param, *args, use_ext=True)
         if c.folder.kind == 'File':
             redirect(c.folder.url_for_rev(rev), **kw)
 
@@ -200,6 +208,10 @@ class BaseRepositoryController(BaseController):
 
     @expose('json', render_params={"sanitize": False})
     def dir_last_commits(self, rev, *args, **kwargs):
+        """
+        Get last commit data about each file/folder in the given folder.
+
+        """
         c.commit, c.folder, rev = get_commit_and_obj(rev, *args)
         data = {}
 
@@ -237,7 +249,8 @@ class BaseRepositoryController(BaseController):
                         author_content,
                         summary=cgi.escape(last_commit['summary']),
                         shortlink=last_commit['shortlink'],
-                        href=last_commit['href'])
+                        href=last_commit['href']
+                )
 
             data[path] = {
                 'extra': {'commit': Markup(commit_text)}
@@ -264,12 +277,14 @@ class BaseRepositoryController(BaseController):
             "shortlink": commit.shorthand_id(),
             "summary": commit.summary
         }
+
         """
         c.commit, c.obj, rev = get_commit_and_obj(rev, *args)
         return c.obj.get_last_commit().info()
 
     @expose(TEMPLATE_DIR + 'readme.html')
     def readme(self, rev, *args, **kwargs):
+        """Render the contents of the readme (if any) in the given folder"""
         commit, folder, rev = get_commit_and_obj(rev, *args)
         readme_file = folder.readme()
         result = {'name': None}
@@ -284,6 +299,10 @@ class BaseRepositoryController(BaseController):
 
     @expose(TEMPLATE_DIR + 'file.html')
     def file(self, rev, *args, **kw):
+        """Visualize a file within the forge. If the parameter format = raw,
+        download the raw file instead.
+
+        """
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
         if c.file.kind == 'Folder':
             redirect(c.file.url_for_rev(rev), **kw)
@@ -326,6 +345,11 @@ class BaseRepositoryController(BaseController):
 
     @expose(TEMPLATE_DIR + 'diff.html')
     def diff(self, rev, *args, **kw):
+        """Render a diff of two files at the same path and different commits.
+
+        The parameter `diff` identifies the commit rev at which to compare
+        the file.
+        """
         c.commit, c.file, rev = get_commit_and_obj(rev, *args, use_ext=True)
         original_ci = c.app.repo.commit(kw['diff'])
         if not original_ci:
@@ -352,6 +376,7 @@ class BaseRepositoryController(BaseController):
 
     @expose(TEMPLATE_DIR + 'commit.html')
     def commit(self, rev, *args, **kw):
+        """Render metadata about a given commit"""
         commit, rev, _ = get_commit(rev, args)
         c.related_artifacts_widget = self.Widgets.related_artifacts_widget
         c.commit_widget = self.Widgets.commit_widget
@@ -361,6 +386,7 @@ class BaseRepositoryController(BaseController):
 
     @expose(TEMPLATE_DIR + 'log.html')
     def history(self, rev, *args, **kw):
+        """Display log starting from given revision"""
         c.commit, rev, _ = get_commit(rev, args)
         path = get_remainder_path(args)
         if path == '/':
@@ -388,6 +414,10 @@ class BaseRepositoryController(BaseController):
     @with_trailing_slash
     @expose(TEMPLATE_DIR + 'fork.html')
     def fork(self, to_name=None, to_label=None, project_name=None):
+        """Form to fork this repository, generating and mounting another tool
+        in the specificied project.
+
+        """
         g.security.require_authenticated()
         if not c.app.forkable:
             raise exc.HTTPNotFound
@@ -410,6 +440,10 @@ class BaseRepositoryController(BaseController):
     @expose()
     @require_post()
     def do_fork(self, to_name=None, to_label=None, project_name=None):
+        """Fork this repository, generating and mounting another tool
+        in the specificied project.
+
+        """
         g.security.require_authenticated()
 
         # collect params
@@ -453,6 +487,7 @@ class BaseRepositoryController(BaseController):
         offset=validators.Int(if_empty=None),
         limit=validators.Int(if_empty=None)))
     def feed(self, since=None, until=None, offset=None, limit=None):
+        """Commit notifications for this repository"""
         if request.environ['PATH_INFO'].endswith('.atom'):
             feed_type = 'atom'
         else:
@@ -472,6 +507,7 @@ class BaseRepositoryController(BaseController):
     @without_trailing_slash
     @expose(TEMPLATE_DIR + 'commit_browser.html')
     def commit_browser(self):  # pragma no cover
+        """Not currently used"""
         if True or not c.app.repo.status in ('ready', 'analyzing'):
             return dict(status='not_ready')
 

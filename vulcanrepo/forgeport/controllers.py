@@ -15,6 +15,7 @@ class ForgePortRestController(BaseController):
         g.security.require_authenticated()
 
     def projects_for_app_config(self, app_config):
+        """Get ForgePort Projects (not VF Projects) for a given app config"""
         repo = app_config.instantiate().repo
         ci = repo.latest()
 

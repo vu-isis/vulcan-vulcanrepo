@@ -20,6 +20,11 @@ LOG = logging.getLogger(__name__)
 
 
 class PostCommitHook(MappedClass):
+    """Representation of an installed post commit hook in the database.
+    Points to the object responsible for the commit logic.
+
+    """
+
     class __mongometa__:
         session = repository_orm_session
         name = 'postcommithook'
@@ -40,6 +45,7 @@ class PostCommitHook(MappedClass):
 
     @classmethod
     def upsert(cls, obj, **kwargs):
+        """Get or create a new post commit hook"""
         isnew = False
         cls_query = {
             "hook_cls.module": obj.__module__,
@@ -54,6 +60,7 @@ class PostCommitHook(MappedClass):
 
     @classmethod
     def from_object(cls, obj, acl=None, description=None, **kwargs):
+        """Install a new commit hook from a given class"""
         if description is None:
             description = getattr(obj, "description", '')
         if acl is None:
@@ -84,6 +91,7 @@ class PostCommitHook(MappedClass):
         super(PostCommitHook, self).delete()
 
     def run(self, commits, args=(), kwargs=None):
+        """Run the post commit hook on the given commits"""
         if not args:
             args = self.default_args
         full_kw = self.default_kwargs.copy()
@@ -158,33 +166,6 @@ class MultiCommitPlugin(Plugin):
         pass
 
 
-class FinalCommitPlugin(MultiCommitPlugin):
-    """pass most recent valid commit only to run"""
-    def __init__(self, restrict_branch_to='master'):
-        self.restrict_branch_to = restrict_branch_to
-        super(MultiCommitPlugin, self).__init__()
-
-    def is_valid_branch(self, commit):
-        valid = True
-        if commit.repo.type_s == 'Git Repository' and self.restrict_branch_to:
-            valid = self.restrict_branch_to in commit.branches()
-        return valid
-
-    def on_submit(self, commits):
-        #if not self.visualizer.bundle_content:
-        for commit in commits[::-1]:
-            if self.is_valid_branch(commit):
-                self.run(commit)
-                break
-        else:
-            # no commit found on valid branch
-            return
-
-    def run(self, commit):
-        """Subclasses override this"""
-        pass
-
-
 class PostCommitError(Exception):
     pass
 
@@ -204,12 +185,15 @@ class VisualizerHook(CommitPlugin):
 class VisualizerManager(MultiCommitPlugin):
     """Syncs repo content with a S3HostedVisualizer"""
 
-    def __init__(self, visualizer_shortname, restrict_branch_to='master'):
-        vis_config = VisualizerConfig.query.get(shortname=visualizer_shortname)
-        if not vis_config:
-            vis_config = VisualizerConfig.from_visualizer(
-                S3HostedVisualizer, shortname=visualizer_shortname)
-        self.visualizer = vis_config.load()
+    def __init__(self, visualizer_shortname=None, restrict_branch_to='master'):
+        self.visualizer = None
+        if visualizer_shortname is not None:
+            vis_config = VisualizerConfig.query.get(shortname=visualizer_shortname)
+            if not vis_config:
+                vis_config = VisualizerConfig.from_visualizer(
+                    S3HostedVisualizer, shortname=visualizer_shortname)
+            self.visualizer = vis_config.load()
+
         self.restrict_branch_to = restrict_branch_to
         super(VisualizerManager, self).__init__()
 
@@ -220,6 +204,9 @@ class VisualizerManager(MultiCommitPlugin):
         return valid
 
     def init_from_commit(self, commit):
+        if self.visualizer is None:
+            return
+
         # find the manifest
         for obj in commit.tree.walk(ignore=['.git', '.svn']):
             if obj.name == 'manifest.json':
@@ -254,3 +241,6 @@ class VisualizerManager(MultiCommitPlugin):
             if self.is_valid_branch(commit):
                 self.init_from_commit(commit)
                 break
+        else:
+            # no commit found on valid branch
+            return
