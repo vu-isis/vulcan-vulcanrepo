@@ -184,8 +184,9 @@ class ForgeGitApp(RepositoryApp):
         )
 
     @classmethod
-    def artifact_counts_by_kind(cls, app_configs, app_visits, tool_name):
+    def artifact_counts_by_kind(cls, app_configs, app_visits, tool_name,
+                                trefs=[]):
         db, coll = GM.GitCommit.get_pymongo_db_and_collection()
         size_item = None
         return get_info(coll, app_configs, app_visits, tool_name, size_item,
-                        has_deleted=False)
+                        has_deleted=False, trefs=trefs)
