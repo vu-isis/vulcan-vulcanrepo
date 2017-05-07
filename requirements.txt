@@ -1,0 +1,3 @@
+git+http://git.vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge-2.0.0
+git+https://git.code.sf.net/p/merciless/code@pymongo-30#egg=Ming
+GitPython==2.1.3

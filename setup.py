@@ -36,7 +36,7 @@ setup(
         "GitPython"
     ],
     dependency_links=[
-        "git+http://vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge-2.0.0"
+        "git+http://git.vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge-2.0.0"
     ],
     setup_requires=["PasteScript >= 1.7"],
     paster_plugins=[
