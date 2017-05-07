@@ -67,7 +67,7 @@ class ForgeSVNApp(RepositoryApp):
         init_from_url = self.config.options.get('init_from_url')
         if cloned_from_repo_id is not None:
             with push_config(c,
-                    project=Project.query.get(_id=cloned_from_project_id)):
+                    project=Project.query_get(_id=cloned_from_project_id)):
                 cloned_from = SM.SVNRepository.query.get(
                     _id=cloned_from_repo_id)
                 repo_tasks.clone.post(

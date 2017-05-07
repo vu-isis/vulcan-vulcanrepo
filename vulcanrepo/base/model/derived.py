@@ -132,7 +132,7 @@ class RepoDerivedObject(BaseMappedClass):
         if not match:
             return None
 
-        project = Project.query.get(shortname=match.group('shortname'))
+        project = Project.by_shortname(match.group('shortname'))
         if not project:
             return None
 
@@ -186,7 +186,7 @@ class RepoDerivedObject(BaseMappedClass):
 
     @property
     def project(self):
-        return Project.query.get(_id=self.project_id)
+        return Project.query_get(_id=self.project_id)
 
     @property
     def authors(self):

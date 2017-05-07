@@ -109,19 +109,28 @@
 {% macro clone_info(repo) %}
   {% if repo %}
     <div id="repo-access-urls" class="padded-block">
+    {% if not (repo.supports_http or c.user.public_key) %}
+        <span>
+            This platform only supports repository access via SSH, which requires that you upload
+            a public key in your <a href="/auth/prefs">User Preferences</a>.
+        </span>
+    {% else %}
        <label for="repo-access-url">repository url</label>
        <select id="repo-access-type" class="access_type">
         {% if g.security.has_access(c.app, 'write') or (not c.user.is_anonymous and g.security.has_access(c.app, 'read')) %}
             {% if c.user.public_key %}
             <option value="{{repo.clone_url('rw')}}">(SSH)</option>
             {% endif %}
+            {% if repo.supports_http %}
             <option value="{{repo.clone_url('https')}}">(HTTPS)</option>
+            {% endif %}
         {% endif %}
-        {% if g.security.has_access(c.app, 'read', c.user.anonymous()) %}
+        {% if repo.supports_http and g.security.has_access(c.app, 'read', c.user.anonymous()) %}
             <option value="{{repo.clone_url('ro')}}">(Anonymous HTTP)</option>
         {% endif %}
       </select>
       <input id="repo-access-url" readonly type="text" class="selectText" value="" />
+    {% endif %}
     </div>
    {% endif %}
 {% endmacro %}

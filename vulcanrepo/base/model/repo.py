@@ -10,6 +10,7 @@ import re
 from datetime import datetime
 from operator import itemgetter
 from itertools import chain, izip_longest
+from urlparse import urlparse
 
 import tg
 from pylons import tmpl_context as c, app_globals as g
@@ -100,10 +101,12 @@ class RepositoryContent(ArtifactApiMixin):
         if escape:
             name = cgi.escape(name)
             path = cgi.escape(path)
+        date = self.commit.committed['date']
         return {
             "name": name,
             "path": path,
             "href": self.url(),
+            "date": date.isoformat(),
             "type": "FILE" if self.kind == "File" else "DIR",
             "artifact": {
                 'reference_id': self.index_id(),
@@ -427,6 +430,15 @@ class Repository(Artifact):
     def full_fs_path(self):
         """Path to the repository on the filesystem"""
         return os.path.join(self.fs_path, self.name)
+
+    @property
+    def supports_http(self):
+        domain = tg.config.get(
+            'scm.domain.{}'.format(self.repo_id),
+            tg.config.get('scm.domain', 'localhost')
+        )
+        base_domain = urlparse(g.base_url).hostname
+        return domain != base_domain
 
     @property
     def email_address(self):

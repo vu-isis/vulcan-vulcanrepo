@@ -182,6 +182,7 @@ class BaseRepositoryController(BaseController):
         else:
             for entry in c.folder.ls(include_self=True):
                 entry.setdefault('extra', {})
+                entry['extra']['date'] = entry['date']
                 entry['extra']['forkUrl'] = '{}_modify/fork_artifact'.format(
                     c.app.url)
 
@@ -293,7 +294,7 @@ class BaseRepositoryController(BaseController):
             if text:
                 result = {
                     'name': readme_file.name,
-                    'text': g.markdown.convert(text)
+                    'text': g.markdown.convert(h.really_unicode(text))
                 }
         return result
 
@@ -449,7 +450,7 @@ class BaseRepositoryController(BaseController):
         # collect params
         from_repo = c.app.repo
         from_project = c.project
-        to_project = Project.query.get(shortname=project_name)
+        to_project = Project.by_shortname(project_name)
         to_name = to_name or c.app.config.options.mount_point
         to_label = to_label or c.app.config.options.mount_label
 

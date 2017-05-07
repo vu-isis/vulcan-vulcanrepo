@@ -104,7 +104,7 @@ class CommitAuthorWidget(ew_core.Widget):
                 author_content = (
                     '<img class="emboss x{size}" src="{src}" '
                     'alt="{author}" title="{author}" />').format(
-                    src=g.gravatar(value['author_email'], size=size),
+                    src=g.user_or_gravatar(value['author_email'], size=size),
                     author=cgi.escape(value['author_name']),
                     size=size
                 )

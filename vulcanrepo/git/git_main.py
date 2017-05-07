@@ -60,7 +60,7 @@ class ForgeGitApp(RepositoryApp):
         cloned_from_repo_id = self.config.options.get('cloned_from_repo_id')
         init_from_url = self.config.options.get('init_from_url')
         if cloned_from_project_id:
-            from_project = Project.query.get(_id=cloned_from_project_id)
+            from_project = Project.query_get(_id=cloned_from_project_id)
             with push_config(c, project=from_project):
                 cloned_from = GM.GitRepository.query.get(
                     _id=cloned_from_repo_id)

@@ -29,11 +29,14 @@ setup(
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 2.7',
         'Topic :: Internet :: WWW/HTTP :: WSGI :: Framework',
-        'License :: OSI Approved :: Apache Software License',
+        'License :: OSI Approved :: MIT',
     ],
     install_requires=[
-        "VulcanForge",
+        "VulcanForge==2.0.0",
         "GitPython"
+    ],
+    dependency_links=[
+        "git+http://vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge-2.0.0"
     ],
     setup_requires=["PasteScript >= 1.7"],
     paster_plugins=[
@@ -53,6 +56,8 @@ setup(
     [paste.paster_command]
     sync_commit_hooks = vulcanrepo.command:SyncCommitHooks
     add_repo_visualizer_hook = vulcanrepo.command:AddRepoVisualizerHook
+    clear_repo_caches = vulcanrepo.command:ClearRepoCaches
+    ensure_repo_hooks = vulcanrepo.command:EnsureDefaultRepoHooks
 
     """
 )

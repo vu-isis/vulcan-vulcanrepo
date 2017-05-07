@@ -36,7 +36,7 @@ def _get_by_slink_with_context(repo, ci_oid, path):
 def repo_get_by_shortlink(parsed_link, match):
     artifact = None
     ci_oid, path = match.group('commit'), match.group('path')
-    project = Project.query.get(shortname=parsed_link['project'])
+    project = Project.by_shortname(parsed_link['project'])
     if project:
         if parsed_link['app']:
             app = project.app_instance(parsed_link['app'])

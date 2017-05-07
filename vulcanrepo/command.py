@@ -6,9 +6,12 @@ from vulcanforge.command import base
 from vulcanforge.common.util.filesystem import import_object
 from vulcanforge.neighborhood.model import Neighborhood
 from vulcanforge.visualize.model import VisualizerConfig
+from vulcanforge.project.model import AppConfig
 
 from vulcanrepo.base.model import PostCommitHook
 from vulcanrepo.base.model.hook import VisualizerManager
+from vulcanrepo.git.model import GitRepository
+from vulcanrepo.svn.model import SVNRepository
 
 
 class SyncCommitHooks(base.Command):
@@ -125,4 +128,58 @@ class AddRepoVisualizerHook(base.Command):
                               ci.object_id)
                 pch.run([ci], args=[vis_shortname], kwargs=hook_kwargs)
 
+        ThreadLocalODMSession.flush_all()
+
+
+def clear_caches():
+    if g.cache:
+        repo_tool_names = ['git', 'svn']
+        q = {'tool_name': {'$in': repo_tool_names}}
+        repos = [str(x._id) for x in AppConfig.query.find(q)]
+        for r in repos:
+            keys = [x for x in g.cache.redis.keys(r + ".*")
+                    if 'tree_json' in g.cache.redis.hkeys(x)]
+            for k in keys:
+                g.cache.redis.hdel(k, 'tree_json')
+
+
+class ClearRepoCaches(base.Command):
+
+    min_args = 1
+    max_args = 1
+
+    usage = "ini_file"
+    summary = "Clear repository browser caches"
+
+    parser = base.Command.standard_parser(verbose=True)
+
+    def command(self):
+        self.basic_setup()
+        clear_caches()
+
+
+def ensure_hooks():
+    for kind in (GitRepository, SVNRepository):
+        repos = kind.query.find()
+        for repo in repos:
+            default_hooks = repo.app._get_default_post_commits()
+            for hook in default_hooks:
+                pch = PostCommitHook.query.get(_id=hook['plugin_id'])
+                if pch:
+                    repo.upsert_post_commit_hook(pch)
+
+
+class EnsureDefaultRepoHooks(base.Command):
+
+    min_args = 1
+    max_args = 1
+
+    usage = "ini_file"
+    summary = "Ensure repository default post-commit hooks"
+
+    parser = base.Command.standard_parser(verbose=True)
+
+    def command(self):
+        self.basic_setup()
+        ensure_hooks()
         ThreadLocalODMSession.flush_all()
