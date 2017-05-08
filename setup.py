@@ -32,11 +32,12 @@ setup(
         'License :: OSI Approved :: MIT',
     ],
     install_requires=[
-        "VulcanForge==2.0.0",
+        "VulcanForge",
         "GitPython"
     ],
     dependency_links=[
-        "git+http://git.vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge-2.0.0"
+        "git+http://git.vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge",
+        "git+https://git.code.sf.net/p/merciless/code@pymongo-30#egg=Ming"
     ],
     setup_requires=["PasteScript >= 1.7"],
     paster_plugins=[
