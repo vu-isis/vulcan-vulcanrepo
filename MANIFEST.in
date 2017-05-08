@@ -1,0 +1,3 @@
+recursive-include vulcanrepo/templates *
+recursive-include vulcanrepo/static *
+recursive-include vulcanrepo/data *

@@ -35,11 +35,12 @@ setup(
         "VulcanForge",
         "GitPython"
     ],
+    include_package_data=True,
     dependency_links=[
         "git+http://git.vulcan.isis.vanderbilt.edu/projects/vulcan/vulcanforge@v2.0.0#egg=VulcanForge",
         "git+https://git.code.sf.net/p/merciless/code@pymongo-30#egg=Ming"
     ],
-    setup_requires=["PasteScript >= 1.7"],
+    setup_requires=["PasteScript >= 1.7", "setuptools_git >= 0.3"],
     paster_plugins=[
         'PasteScript', 'Pylons', 'TurboGears2', 'tg.devtools', 'Ming'],
     packages=find_packages(exclude=['ez_setup']),
