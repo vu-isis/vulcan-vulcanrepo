@@ -61,6 +61,7 @@ setup(
     clear_repo_caches = vulcanrepo.command:ClearRepoCaches
     ensure_repo_hooks = vulcanrepo.command:EnsureDefaultRepoHooks
 
-    """
+    """,
+    zip_safe=False
 )
 
